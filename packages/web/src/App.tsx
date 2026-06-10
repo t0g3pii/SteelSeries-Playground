@@ -93,11 +93,70 @@ export default function App() {
     }
   }
 
-  function setRotationModuleIds(moduleIds: string[]) {
-    updatePrefs({
-      ...prefs,
-      rotation: { ...prefs.rotation, moduleIds },
-    });
+  async function commitRotationPrefs(
+    rotation: DisplayPreferences["rotation"],
+    previous = prefs,
+  ) {
+    if (rotation.moduleIds.length === 0) {
+      throw new Error("Mindestens ein Modul für die Rotation auswählen");
+    }
+
+    const next = { ...prefs, rotation };
+    updatePrefs(next);
+
+    if (!running || prefs.mode !== "rotation") {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      await applyDisplayConfig(next);
+    } catch (err) {
+      updatePrefs(previous);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRotationModuleIdsChange(moduleIds: string[]) {
+    if (moduleIds.length === 0) {
+      setError("Mindestens ein Modul in der Rotation");
+      return;
+    }
+
+    try {
+      await commitRotationPrefs({ ...prefs.rotation, moduleIds });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Rotation fehlgeschlagen",
+      );
+    }
+  }
+
+  async function handleRotationTrackChange(onTrackChange: boolean) {
+    try {
+      await commitRotationPrefs({ ...prefs.rotation, onTrackChange });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Rotation fehlgeschlagen",
+      );
+    }
+  }
+
+  async function handleRotationTimingBlur() {
+    if (!running || prefs.mode !== "rotation") {
+      return;
+    }
+
+    try {
+      await commitRotationPrefs(prefs.rotation);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Rotation fehlgeschlagen",
+      );
+    }
   }
 
   const load = useCallback(async () => {
@@ -252,7 +311,6 @@ export default function App() {
 
   const running = status?.display.running ?? false;
   const connected = status?.gameSense.connected ?? false;
-  const rotationRunning = running && status?.display.mode === "rotation";
   const activeModuleId =
     oledPreview?.activeModuleId ??
     status?.display.rotation?.currentModuleId ??
@@ -363,8 +421,10 @@ export default function App() {
               <RotationModuleList
                 modules={status?.modules ?? []}
                 selectedIds={prefs.rotation.moduleIds}
-                disabled={loading || rotationRunning}
-                onChange={setRotationModuleIds}
+                disabled={loading || !connected}
+                onChange={(moduleIds) =>
+                  void handleRotationModuleIdsChange(moduleIds)
+                }
               />
 
               <div className="rotation-settings">
@@ -387,7 +447,8 @@ export default function App() {
                         },
                       })
                     }
-                    disabled={loading || rotationRunning}
+                    onBlur={() => void handleRotationTimingBlur()}
+                    disabled={loading || !connected}
                   />
                 </label>
                 <label className="rotation-setting">
@@ -409,7 +470,8 @@ export default function App() {
                         },
                       })
                     }
-                    disabled={loading || rotationRunning}
+                    onBlur={() => void handleRotationTimingBlur()}
+                    disabled={loading || !connected}
                   />
                 </label>
               </div>
@@ -419,15 +481,9 @@ export default function App() {
                   type="checkbox"
                   checked={prefs.rotation.onTrackChange}
                   onChange={(e) =>
-                    updatePrefs({
-                      ...prefs,
-                      rotation: {
-                        ...prefs.rotation,
-                        onTrackChange: e.target.checked,
-                      },
-                    })
+                    void handleRotationTrackChange(e.target.checked)
                   }
-                  disabled={loading || rotationRunning}
+                  disabled={loading || !connected}
                 />
                 <span>Bei neuem Song → Now Playing priorisieren</span>
               </label>

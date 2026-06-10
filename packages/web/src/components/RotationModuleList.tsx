@@ -117,7 +117,7 @@ export function RotationModuleList({
                 type="button"
                 className="rotation-remove-btn"
                 onClick={() => removeModule(module.id)}
-                disabled={disabled}
+                disabled={disabled || selectedModules.length <= 1}
                 aria-label={`${module.name} aus Rotation entfernen`}
               >
                 Entfernen

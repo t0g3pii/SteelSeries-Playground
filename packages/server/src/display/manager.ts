@@ -263,8 +263,16 @@ export class DisplayManager {
       const moduleIds = this.validateRotationModuleIds(
         options.rotation.moduleIds,
       );
+      const wasRotation =
+        this.displayMode === "rotation" && this.rotation.isActive();
       this.displayMode = "rotation";
-      this.rotation.start(options.rotation);
+
+      if (wasRotation) {
+        this.rotation.update(options.rotation);
+      } else {
+        this.rotation.start(options.rotation);
+      }
+
       await this.rebindHandlers(moduleIds);
 
       const initialModuleId =

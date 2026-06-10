@@ -47,16 +47,60 @@ export class DisplayRotationController {
       throw new Error("Rotations-Warteschlange ist leer");
     }
 
-    this.config = {
+    this.config = this.normalizeConfig(config);
+    this.currentIndex = 0;
+    this.slotStartedAt = Date.now();
+    this.eventHoldUntil = null;
+    this.eventTargetModuleId = null;
+  }
+
+  /** Live-Update — behält aktuelles Modul wenn möglich. */
+  update(config: DisplayRotationConfig): void {
+    if (config.moduleIds.length === 0) {
+      throw new Error("Rotations-Warteschlange ist leer");
+    }
+
+    const previousActiveId = this.resolveActiveModuleId();
+    const previousIndex = this.currentIndex;
+
+    this.config = this.normalizeConfig(config);
+
+    if (previousActiveId) {
+      const nextIndex = this.config.moduleIds.indexOf(previousActiveId);
+      if (nextIndex >= 0) {
+        this.currentIndex = nextIndex;
+      } else {
+        this.currentIndex = Math.min(
+          previousIndex,
+          this.config.moduleIds.length - 1,
+        );
+        this.slotStartedAt = Date.now();
+      }
+    } else {
+      this.currentIndex = Math.min(
+        this.currentIndex,
+        this.config.moduleIds.length - 1,
+      );
+    }
+
+    if (
+      this.eventTargetModuleId &&
+      !this.config.moduleIds.includes(this.eventTargetModuleId)
+    ) {
+      this.eventHoldUntil = null;
+      this.eventTargetModuleId = null;
+    }
+  }
+
+  private normalizeConfig(
+    config: DisplayRotationConfig,
+  ): DisplayRotationConfig {
+    return {
       moduleIds: [...config.moduleIds],
       intervalMs: Math.max(1_000, config.intervalMs),
       eventHoldMs: Math.max(1_000, config.eventHoldMs),
       events: [...config.events],
     };
-    this.currentIndex = 0;
-    this.slotStartedAt = Date.now();
-    this.eventHoldUntil = null;
-    this.eventTargetModuleId = null;
   }
 
   stop(): void {
