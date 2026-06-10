@@ -124,41 +124,30 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  min-height: 26rem;
 }
 
 .oled-card h2 {
   align-self: stretch;
 }
 
-.oled-ip-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  width: 100%;
-  margin: 0.75rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.oled-ip-meta div {
+.oled-card-content {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  flex: 1;
+  min-height: 22rem;
 }
 
-.oled-ip-meta dt {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.oled-preview-slot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 14rem;
 }
 
-.oled-ip-meta dd {
-  margin: 0;
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
-  word-break: break-all;
+.oled-meta-slot {
+  flex-shrink: 0;
 }
 
 .label {
@@ -184,21 +173,6 @@ h1 {
 .display-mode-label {
   color: #94a3b8;
   font-size: 0.85rem;
-}
-
-.display-mode-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.mode-option {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: #e2e8f0;
-  font-size: 0.95rem;
-  cursor: pointer;
 }
 
 .rotation-panel {
@@ -238,11 +212,6 @@ h1 {
   border: 1px solid rgba(148, 163, 184, 0.25);
   background: rgba(30, 41, 59, 0.9);
   color: inherit;
-}
-
-.rotation-status {
-  margin-top: 0;
-  margin-bottom: 0.75rem;
 }
 
 .module-row {
@@ -325,9 +294,16 @@ button.secondary {
   color: #bfdbfe;
 }
 
-.deadzone-hint {
-  margin-top: 0;
-  margin-bottom: 1.25rem;
+button.danger {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(127, 29, 29, 0.4);
+  color: #fecaca;
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(153, 27, 27, 0.55);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 800px) {

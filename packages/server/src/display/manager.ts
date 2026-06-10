@@ -231,6 +231,25 @@ export class DisplayManager {
     await this.pushUpdate();
   }
 
+  async switchModule(moduleId: string): Promise<void> {
+    if (!this.running) {
+      throw new Error("Display läuft nicht");
+    }
+
+    if (this.displayMode !== "single") {
+      throw new Error("Modulwechsel nur im Einzelmodul-Modus");
+    }
+
+    const module = this.registry.get(moduleId);
+    if (!module) {
+      throw new Error(`Modul '${moduleId}' nicht gefunden`);
+    }
+
+    this.stopManualTest();
+    await this.activateModule(moduleId);
+    await this.pushUpdate();
+  }
+
   async showFeatureTest(): Promise<void> {
     if (!this.running) {
       throw new Error("Display läuft nicht");
@@ -327,6 +346,7 @@ export class DisplayManager {
         deviceView: { maskBelowY: devicePreviewMaskBelowY(64) },
         activeDisplayMode: "bitmap",
         frameKind: "idle",
+        activeModuleId: null,
         componentTestId: null,
         media: null,
         running: this.running,
@@ -339,11 +359,17 @@ export class DisplayManager {
 
     const mediaModule = this.registry.get("media") as MediaModule | undefined;
 
+    const activeModuleId =
+      this.displayMode === "rotation"
+        ? this.rotation.resolveActiveModuleId()
+        : this.activeModuleId;
+
     return buildOledPreview({
       ipModule,
       media: mediaModule?.getCachedNowPlaying() ?? null,
       running: this.running,
       frameKind: this.oledFrameKind,
+      activeModuleId,
       lastFrame: this.lastFrame,
       componentTestId: this.componentTestId,
     });

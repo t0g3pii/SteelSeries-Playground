@@ -122,6 +122,7 @@ export interface OledPreviewResponse {
   deviceView: OledDeviceView;
   activeDisplayMode: "bitmap" | "text";
   frameKind: OledFrameKind;
+  activeModuleId: string | null;
   componentTestId: ComponentTestId | null;
   media: MediaNowPlaying | null;
   running: boolean;
@@ -153,6 +154,11 @@ export const api = {
     }),
   stopDisplay: () =>
     request<{ ok: boolean }>("/api/display/stop", { method: "POST" }),
+  switchDisplayModule: (moduleId: string) =>
+    request<{ ok: boolean }>("/api/display/switch", {
+      method: "POST",
+      body: JSON.stringify({ moduleId }),
+    }),
   refreshDisplay: () =>
     request<{ ok: boolean }>("/api/display/refresh", { method: "POST" }),
   getDeadzone: () => request<DeadzoneInfo>("/api/display/deadzone"),

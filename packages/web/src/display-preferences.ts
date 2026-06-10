@@ -85,6 +85,52 @@ export function sanitizeModuleId(
   return availableIds[0] ?? DEFAULTS.moduleId;
 }
 
+export function prefsFromRunningDisplay(
+  display: {
+    running: boolean;
+    mode: DisplayUiMode;
+    moduleId: string | null;
+    rotation: {
+      moduleIds: string[];
+      intervalMs: number;
+      eventHoldMs: number;
+      events: string[];
+    } | null;
+  },
+  availableIds: string[],
+  current: DisplayPreferences,
+): DisplayPreferences {
+  if (!display.running) {
+    return current;
+  }
+
+  if (display.mode === "rotation" && display.rotation) {
+    return {
+      ...current,
+      mode: "rotation",
+      rotation: {
+        moduleIds: sanitizeRotationModuleIds(
+          display.rotation.moduleIds,
+          availableIds,
+        ),
+        intervalSec: Math.round(display.rotation.intervalMs / 1000),
+        eventHoldSec: Math.round(display.rotation.eventHoldMs / 1000),
+        onTrackChange: display.rotation.events.includes("media:track-changed"),
+      },
+    };
+  }
+
+  if (display.mode === "single" && display.moduleId) {
+    return {
+      ...current,
+      mode: "single",
+      moduleId: sanitizeModuleId(display.moduleId, availableIds),
+    };
+  }
+
+  return current;
+}
+
 export function sanitizeRotationModuleIds(
   moduleIds: string[],
   availableIds: string[],

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
-  type DeadzoneInfo,
-  type IpResponse,
   type OledPreviewResponse,
   type StatusResponse,
 } from "./api";
+import { FlipSwitch } from "./components/FlipSwitch";
 import { OledLivePreview } from "./components/OledLivePreview";
+import { OledPreviewMeta } from "./components/OledPreviewMeta";
 import { RotationModuleList } from "./components/RotationModuleList";
 import {
   loadDisplayPreferences,
+  prefsFromRunningDisplay,
   saveDisplayPreferences,
   sanitizeModuleId,
   sanitizeRotationModuleIds,
@@ -25,20 +26,10 @@ function formatTime(iso: string | null): string {
   return new Date(iso).toLocaleTimeString("de-DE");
 }
 
-function formatDurationMs(ms: number): string {
-  const totalSec = Math.round(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  if (min === 0) return `${sec} s`;
-  return sec > 0 ? `${min} min ${sec} s` : `${min} min`;
-}
-
 export default function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [ips, setIps] = useState<IpResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deadzone, setDeadzone] = useState<DeadzoneInfo | null>(null);
   const [featureTest, setFeatureTest] = useState<FeatureTestInfo | null>(null);
   const [oledPreview, setOledPreview] = useState<OledPreviewResponse | null>(
     null,
@@ -56,10 +47,6 @@ export default function App() {
     updatePrefs({ ...prefs, mode });
   }
 
-  function setStartModuleId(moduleId: string) {
-    updatePrefs({ ...prefs, moduleId });
-  }
-
   function setRotationModuleIds(moduleIds: string[]) {
     updatePrefs({
       ...prefs,
@@ -69,24 +56,19 @@ export default function App() {
 
   const load = useCallback(async () => {
     try {
-      const [statusData, ipData, deadzoneData, previewData, featureTestData] =
-        await Promise.all([
-          api.getStatus(),
-          api.getIps(),
-          api.getDeadzone(),
-          api.getOledPreview(),
-          api.getFeatureTestInfo(),
-        ]);
+      const [statusData, previewData, featureTestData] = await Promise.all([
+        api.getStatus(),
+        api.getOledPreview(),
+        api.getFeatureTestInfo(),
+      ]);
       setStatus(statusData);
-      setIps(ipData);
-      setDeadzone(deadzoneData);
       setOledPreview(previewData);
       setFeatureTest(featureTestData);
       setError(null);
 
       const availableIds = statusData.modules.map((module) => module.id);
       setPrefs((current) => {
-        const sanitized: DisplayPreferences = {
+        let next = {
           ...current,
           moduleId: sanitizeModuleId(current.moduleId, availableIds),
           rotation: {
@@ -97,14 +79,29 @@ export default function App() {
             ),
           },
         };
-        if (
-          sanitized.moduleId !== current.moduleId ||
-          sanitized.rotation.moduleIds.join(",") !==
-            current.rotation.moduleIds.join(",")
-        ) {
-          saveDisplayPreferences(sanitized);
+
+        if (statusData.display.running) {
+          next = prefsFromRunningDisplay(
+            statusData.display,
+            availableIds,
+            next,
+          );
         }
-        return sanitized;
+
+        const changed =
+          next.mode !== current.mode ||
+          next.moduleId !== current.moduleId ||
+          next.rotation.moduleIds.join(",") !==
+            current.rotation.moduleIds.join(",") ||
+          next.rotation.intervalSec !== current.rotation.intervalSec ||
+          next.rotation.eventHoldSec !== current.rotation.eventHoldSec ||
+          next.rotation.onTrackChange !== current.rotation.onTrackChange;
+
+        if (changed) {
+          saveDisplayPreferences(next);
+        }
+
+        return next;
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Laden fehlgeschlagen");
@@ -177,14 +174,26 @@ export default function App() {
     }
   }
 
-  async function handleRefresh() {
+  async function handleSingleModuleChange(moduleId: string) {
+    updatePrefs({ ...prefs, moduleId });
+
+    if (!running || prefs.mode !== "single") {
+      return;
+    }
+
+    if (moduleId === status?.display.moduleId) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      await api.refreshDisplay();
+      await api.switchDisplayModule(moduleId);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Aktualisierung fehlgeschlagen");
+      setError(
+        err instanceof Error ? err.message : "Modulwechsel fehlgeschlagen",
+      );
     } finally {
       setLoading(false);
     }
@@ -210,8 +219,12 @@ export default function App() {
 
   const running = status?.display.running ?? false;
   const connected = status?.gameSense.connected ?? false;
-  const rotationActive = status?.display.mode === "rotation";
-  const rotationStatus = status?.display.rotation;
+  const rotationRunning = running && status?.display.mode === "rotation";
+  const activeModuleId =
+    oledPreview?.activeModuleId ??
+    status?.display.rotation?.currentModuleId ??
+    status?.display.moduleId ??
+    null;
 
   return (
     <div className="app">
@@ -258,44 +271,24 @@ export default function App() {
 
         <article className="card oled-card">
           <h2>Live-Ansicht</h2>
-          {oledPreview ? (
-            <OledLivePreview preview={oledPreview} />
-          ) : (
-            <p className="hint">OLED-Vorschau wird geladen…</p>
-          )}
-          {oledPreview?.frameKind === "media" && oledPreview.media ? (
-            <dl className="oled-ip-meta">
-              <div>
-                <dt>Titel</dt>
-                <dd>{oledPreview.media.title || "—"}</dd>
-              </div>
-              <div>
-                <dt>Interpret</dt>
-                <dd>{oledPreview.media.artist || "—"}</dd>
-              </div>
-              {oledPreview.media.timeline ? (
-                <div>
-                  <dt>Zeit</dt>
-                  <dd>{oledPreview.media.timeline}</dd>
-                </div>
+          <div className="oled-card-content">
+            <div className="oled-preview-slot">
+              {oledPreview ? (
+                <OledLivePreview preview={oledPreview} />
+              ) : (
+                <p className="hint">OLED-Vorschau wird geladen…</p>
+              )}
+            </div>
+            <div className="oled-meta-slot">
+              {oledPreview ? (
+                <OledPreviewMeta
+                  preview={oledPreview}
+                  activeModuleId={activeModuleId}
+                  modules={status?.modules ?? []}
+                />
               ) : null}
-              <div>
-                <dt>App</dt>
-                <dd>{oledPreview.media.appLabel || "—"}</dd>
-              </div>
-            </dl>
-          ) : (
-            <dl className="oled-ip-meta">
-              <div>
-                <dt>LAN</dt>
-                <dd>{ips?.lan ?? oledPreview?.lan ?? "—"}</dd>
-              </div>
-              <div>
-                <dt>WAN</dt>
-                <dd>{ips?.wan ?? oledPreview?.wan ?? "—"}</dd>
-              </div>
-            </dl>
-          )}
+            </div>
+          </div>
         </article>
 
         <article className="card wide">
@@ -303,30 +296,16 @@ export default function App() {
 
           <div className="display-mode-row">
             <span className="display-mode-label">Anzeige-Modus</span>
-            <div className="display-mode-options">
-              <label className="mode-option">
-                <input
-                  type="radio"
-                  name="display-mode"
-                  value="single"
-                  checked={prefs.mode === "single"}
-                  onChange={() => setDisplayMode("single")}
-                  disabled={loading || running}
-                />
-                Einzelmodul
-              </label>
-              <label className="mode-option">
-                <input
-                  type="radio"
-                  name="display-mode"
-                  value="rotation"
-                  checked={prefs.mode === "rotation"}
-                  onChange={() => setDisplayMode("rotation")}
-                  disabled={loading || running}
-                />
-                Rotation
-              </label>
-            </div>
+            <FlipSwitch
+              value={prefs.mode}
+              options={[
+                { value: "single", label: "Einzelmodul" },
+                { value: "rotation", label: "Rotation" },
+              ]}
+              onChange={setDisplayMode}
+              disabled={loading || running}
+              ariaLabel="Anzeige-Modus"
+            />
           </div>
 
           {prefs.mode === "single" ? (
@@ -335,8 +314,8 @@ export default function App() {
               <select
                 id="module"
                 value={prefs.moduleId}
-                onChange={(e) => setStartModuleId(e.target.value)}
-                disabled={loading || running}
+                onChange={(e) => void handleSingleModuleChange(e.target.value)}
+                disabled={loading || !connected}
               >
                 {(status?.modules ?? []).map((module) => (
                   <option key={module.id} value={module.id}>
@@ -351,7 +330,7 @@ export default function App() {
               <RotationModuleList
                 modules={status?.modules ?? []}
                 selectedIds={prefs.rotation.moduleIds}
-                disabled={loading || running}
+                disabled={loading || rotationRunning}
                 onChange={setRotationModuleIds}
               />
 
@@ -375,7 +354,7 @@ export default function App() {
                         },
                       })
                     }
-                    disabled={loading || running}
+                    disabled={loading || rotationRunning}
                   />
                 </label>
                 <label className="rotation-setting">
@@ -397,7 +376,7 @@ export default function App() {
                         },
                       })
                     }
-                    disabled={loading || running}
+                    disabled={loading || rotationRunning}
                   />
                 </label>
               </div>
@@ -415,29 +394,12 @@ export default function App() {
                       },
                     })
                   }
-                  disabled={loading || running}
+                  disabled={loading || rotationRunning}
                 />
                 <span>Bei neuem Song → Now Playing priorisieren</span>
               </label>
             </div>
           )}
-
-          {running && rotationActive && rotationStatus ? (
-            <p className="hint rotation-status">
-              Rotation aktiv:{" "}
-              {rotationStatus.moduleIds
-                .map(
-                  (id) =>
-                    status?.modules.find((module) => module.id === id)?.name ??
-                    id,
-                )
-                .join(" → ")}{" "}
-              ({rotationStatus.intervalMs / 1000} s) — aktuell{" "}
-              {status?.modules.find(
-                (module) => module.id === rotationStatus.currentModuleId,
-              )?.name ?? rotationStatus.currentModuleId}
-            </p>
-          ) : null}
 
           <div className="controls">
             <button
@@ -457,34 +419,14 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => void handleRefresh()}
-              disabled={loading || !running}
-            >
-              Jetzt aktualisieren
-            </button>
-            <button
-              type="button"
-              className="secondary"
+              className="danger"
               onClick={() => void handleFeatureTest()}
               disabled={loading || !running}
+              title="Belastet das GameDAC stark — nur für Tests"
             >
               Feature-Test
             </button>
           </div>
-
-          {deadzone && featureTest && (
-            <p className="hint deadzone-hint">
-              Geräteansicht {deadzone.drawable.width}×
-              {deadzone.drawable.height}px (gesendet {deadzone.screen.width}×
-              {deadzone.screen.height}px) — max. {deadzone.deviceVisibleTextLines}{" "}
-              Textzeilen à {deadzone.lineHeight}px. Feature-Test (
-              {formatDurationMs(featureTest.totalMs)}, {featureTest.phaseCount}{" "}
-              Phasen): Pixel-Check → Zeilen → Deadzone → Progressbar → Gauge →
-              Volume → Sparkline → Uhr → Status → EQ → Spinner → Marquee →
-              7-Segment — danach IP-Anzeige.
-            </p>
-          )}
-
         </article>
       </section>
     </div>

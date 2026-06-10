@@ -44,6 +44,7 @@ export interface OledPreviewResponse {
   deviceView: OledDeviceView;
   activeDisplayMode: "bitmap" | "text";
   frameKind: OledFrameKind;
+  activeModuleId: string | null;
   componentTestId: ComponentTestId | null;
   media: MediaNowPlaying | null;
   running: boolean;
@@ -59,6 +60,7 @@ export interface OledPreviewParams {
   media: MediaNowPlaying | null;
   running: boolean;
   frameKind: OledFrameKind;
+  activeModuleId?: string | null;
   lastFrame: Record<string, unknown> | null;
   componentTestId?: ComponentTestId | null;
 }
@@ -77,6 +79,7 @@ export function buildOledPreview(params: OledPreviewParams): OledPreviewResponse
     media,
     running,
     frameKind,
+    activeModuleId = null,
     lastFrame,
     componentTestId = null,
   } = params;
@@ -116,8 +119,11 @@ export function buildOledPreview(params: OledPreviewParams): OledPreviewResponse
     },
     activeDisplayMode,
     frameKind: kind,
+    activeModuleId: running ? activeModuleId : null,
     componentTestId: running ? componentTestId : null,
-    media: running && frameKind === "media" ? media : null,
+    media: running && (activeModuleId === "media" || frameKind === "media")
+      ? media
+      : null,
     running,
     lan,
     wan,

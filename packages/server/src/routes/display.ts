@@ -103,6 +103,26 @@ export function createDisplayRouter(displayManager: DisplayManager): Router {
     }
   });
 
+  router.post("/switch", async (req: Request, res: Response) => {
+    const moduleId =
+      typeof req.body?.moduleId === "string" ? req.body.moduleId : "";
+
+    if (!moduleId) {
+      res.status(400).json({ ok: false, error: "moduleId fehlt" });
+      return;
+    }
+
+    try {
+      await displayManager.switchModule(moduleId);
+      res.json({ ok: true, display: displayManager.getStatus() });
+    } catch (err) {
+      res.status(400).json({
+        ok: false,
+        error: err instanceof Error ? err.message : "Modulwechsel fehlgeschlagen",
+      });
+    }
+  });
+
   router.get("/deadzone", (_req: Request, res: Response) => {
     res.json(getDeadzoneInfo(64));
   });
