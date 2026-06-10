@@ -7,7 +7,7 @@ import { PORT } from "./config.js";
 import { DisplayManager } from "./display/manager.js";
 import { GameSenseClient } from "./gamesense/client.js";
 import { ModuleRegistry } from "./modules/registry.js";
-import { createApiRouter } from "./routes/api.js";
+import { createApiRouter } from "./routes/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webDist = path.resolve(__dirname, "../../web/dist");

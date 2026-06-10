@@ -9,6 +9,7 @@ import {
   getTextScreenHandlers,
 } from "../oled/text-handler.js";
 import { DEFAULT_REFRESH_INTERVAL_MS } from "../config.js";
+import type { OledFrameKind } from "../oled/preview.js";
 import type { DisplayFrame, DisplayModule } from "./types.js";
 
 const WAN_TIMEOUT_MS = 5_000;
@@ -45,6 +46,9 @@ async function getExternalIpv4(): Promise<string> {
 export class IpModule implements DisplayModule {
   readonly id = "ip";
   readonly name = "IP-Anzeige";
+  readonly description = "LAN- und WAN-IP auf dem OLED.";
+  readonly supportsRotation = true;
+  readonly staticFrame = true;
   readonly preferredRefreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS;
 
   private cachedLan = "---";
@@ -79,5 +83,14 @@ export class IpModule implements DisplayModule {
 
   getCachedIps(): { lan: string; wan: string } {
     return { lan: this.cachedLan, wan: this.cachedWan };
+  }
+
+  getFrameKind(): OledFrameKind {
+    return getDisplayMode() === "text" ? "text" : "ip";
+  }
+
+  async getModuleData(): Promise<{ lan: string; wan: string }> {
+    await this.fetchIps();
+    return this.getCachedIps();
   }
 }

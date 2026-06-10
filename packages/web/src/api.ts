@@ -1,6 +1,27 @@
 import type { ComponentTestId } from "./component-tests";
 import type { FeatureTestInfo } from "./feature-test";
 
+export type DisplayRotationEventId = "media:track-changed";
+
+export interface DisplayRotationStatus {
+  active: boolean;
+  moduleIds: string[];
+  intervalMs: number;
+  eventHoldMs: number;
+  events: DisplayRotationEventId[];
+  currentIndex: number;
+  currentModuleId: string | null;
+  eventHoldUntil: string | null;
+}
+
+export interface ModuleInfo {
+  id: string;
+  name: string;
+  description?: string;
+  supportsRotation?: boolean;
+  rotationEvents?: DisplayRotationEventId[];
+}
+
 export interface StatusResponse {
   gameSense: {
     connected: boolean;
@@ -9,12 +30,32 @@ export interface StatusResponse {
   };
   display: {
     running: boolean;
+    mode: "single" | "rotation";
     moduleId: string | null;
+    rotation: DisplayRotationStatus | null;
     refreshIntervalMs: number;
     lastUpdate: string | null;
     lastError: string | null;
   };
-  modules: Array<{ id: string; name: string }>;
+  modules: ModuleInfo[];
+}
+
+export interface DisplayRotationConfig {
+  moduleIds: string[];
+  intervalMs: number;
+  eventHoldMs: number;
+  events: DisplayRotationEventId[];
+}
+
+export type StartDisplayBody =
+  | { moduleId: string }
+  | { rotation: DisplayRotationConfig };
+
+export interface ModuleDataResponse<T = unknown> {
+  id: string;
+  name: string;
+  data: T;
+  refreshIntervalMs: number;
 }
 
 export interface IpResponse {
@@ -105,10 +146,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getStatus: () => request<StatusResponse>("/api/status"),
-  startDisplay: (moduleId = "ip") =>
+  startDisplay: (body: StartDisplayBody) =>
     request<{ ok: boolean }>("/api/display/start", {
       method: "POST",
-      body: JSON.stringify({ moduleId }),
+      body: JSON.stringify(body),
     }),
   stopDisplay: () =>
     request<{ ok: boolean }>("/api/display/stop", { method: "POST" }),
@@ -131,9 +172,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ id }),
     }),
-  getIps: () => request<IpResponse>("/api/modules/ip"),
-  getMedia: () =>
-    request<MediaNowPlaying & { refreshIntervalMs: number }>(
+  getModule: <T = unknown>(id: string) =>
+    request<ModuleDataResponse<T>>(`/api/modules/${id}`),
+  getIps: async () => {
+    const response = await request<ModuleDataResponse<Pick<IpResponse, "lan" | "wan">>>(
+      "/api/modules/ip",
+    );
+    return {
+      lan: response.data.lan,
+      wan: response.data.wan,
+      refreshIntervalMs: response.refreshIntervalMs,
+    };
+  },
+  getMedia: async () => {
+    const response = await request<ModuleDataResponse<MediaNowPlaying>>(
       "/api/modules/media",
-    ),
+    );
+    return {
+      ...response.data,
+      refreshIntervalMs: response.refreshIntervalMs,
+    };
+  },
 };

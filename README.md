@@ -60,11 +60,11 @@ Die gebaute Web-UI wird dann vom API-Server unter `http://localhost:3000` ausgel
 | Methode | Pfad | Beschreibung |
 |---------|------|--------------|
 | GET | `/api/status` | Verbindungs- und Display-Status |
-| POST | `/api/display/start` | OLED-Aktualisierung starten |
+| POST | `/api/display/start` | Start: `{ moduleId }` oder `{ rotation: { moduleIds, intervalMs, eventHoldMs, events } }` |
 | POST | `/api/display/stop` | OLED-Aktualisierung stoppen |
 | POST | `/api/display/refresh` | Sofort aktualisieren |
-| GET | `/api/modules/ip` | Aktuelle LAN/WAN-IPs |
-| GET | `/api/modules/media` | Windows Now Playing (Titel, Interpret, Cover) |
+| GET | `/api/modules` | Alle registrierten Display-Module |
+| GET | `/api/modules/:id` | Modul-Daten (z. B. `ip`, `media`) |
 | GET | `/api/oled/components` | Verfügbare OLED-UI-Komponenten (Discovery) |
 | GET | `/api/display/feature-test` | Feature-Test-Dauer und Phasen |
 | POST | `/api/display/feature-test` | Komplette OLED-Demo-Sequenz starten |
@@ -91,11 +91,16 @@ Die gebaute Web-UI wird dann vom API-Server unter `http://localhost:3000` ausgel
 ## Architektur
 
 ```
-packages/server   Express API, GameSense-Client, Display-Module
-packages/web      React Dashboard
+packages/server
+  src/routes/     REST-API (display, modules, oled)
+  src/modules/    Display-Module / Plugins (ip, media, template, …)
+  src/oled/       OLED Component API (Frame-Builder, Layout)
+  src/display/    DisplayManager + Rotation
+packages/web      React Dashboard (Einstellungen in localStorage)
 ```
 
-Neue Anzeige-Module können über `ModuleRegistry` in `packages/server/src/modules/` ergänzt werden.
+Neue Anzeige-Module: `packages/server/src/modules/README.md` und `template-module.ts` als Vorlage.  
+OLED-Bausteine für Module: `docs/OLED-API.md` und `packages/server/src/oled/api.ts`.
 
 ### OLED Layout Contract (verbindlich)
 

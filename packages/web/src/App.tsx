@@ -7,6 +7,15 @@ import {
   type StatusResponse,
 } from "./api";
 import { OledLivePreview } from "./components/OledLivePreview";
+import { RotationModuleList } from "./components/RotationModuleList";
+import {
+  loadDisplayPreferences,
+  saveDisplayPreferences,
+  sanitizeModuleId,
+  sanitizeRotationModuleIds,
+  type DisplayPreferences,
+  type DisplayUiMode,
+} from "./display-preferences";
 import type { FeatureTestInfo } from "./feature-test";
 import { getOledPreviewPollIntervalMs } from "./oled-preview-poll";
 import "./App.css";
@@ -34,7 +43,29 @@ export default function App() {
   const [oledPreview, setOledPreview] = useState<OledPreviewResponse | null>(
     null,
   );
-  const [startModuleId, setStartModuleId] = useState("ip");
+  const [prefs, setPrefs] = useState<DisplayPreferences>(() =>
+    loadDisplayPreferences(),
+  );
+
+  function updatePrefs(next: DisplayPreferences) {
+    setPrefs(next);
+    saveDisplayPreferences(next);
+  }
+
+  function setDisplayMode(mode: DisplayUiMode) {
+    updatePrefs({ ...prefs, mode });
+  }
+
+  function setStartModuleId(moduleId: string) {
+    updatePrefs({ ...prefs, moduleId });
+  }
+
+  function setRotationModuleIds(moduleIds: string[]) {
+    updatePrefs({
+      ...prefs,
+      rotation: { ...prefs.rotation, moduleIds },
+    });
+  }
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +83,29 @@ export default function App() {
       setOledPreview(previewData);
       setFeatureTest(featureTestData);
       setError(null);
+
+      const availableIds = statusData.modules.map((module) => module.id);
+      setPrefs((current) => {
+        const sanitized: DisplayPreferences = {
+          ...current,
+          moduleId: sanitizeModuleId(current.moduleId, availableIds),
+          rotation: {
+            ...current.rotation,
+            moduleIds: sanitizeRotationModuleIds(
+              current.rotation.moduleIds,
+              availableIds,
+            ),
+          },
+        };
+        if (
+          sanitized.moduleId !== current.moduleId ||
+          sanitized.rotation.moduleIds.join(",") !==
+            current.rotation.moduleIds.join(",")
+        ) {
+          saveDisplayPreferences(sanitized);
+        }
+        return sanitized;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Laden fehlgeschlagen");
     }
@@ -85,7 +139,23 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      await api.startDisplay(startModuleId);
+      if (prefs.mode === "rotation") {
+        if (prefs.rotation.moduleIds.length === 0) {
+          throw new Error("Mindestens ein Modul für die Rotation auswählen");
+        }
+        await api.startDisplay({
+          rotation: {
+            moduleIds: prefs.rotation.moduleIds,
+            intervalMs: prefs.rotation.intervalSec * 1000,
+            eventHoldMs: prefs.rotation.eventHoldSec * 1000,
+            events: prefs.rotation.onTrackChange
+              ? ["media:track-changed"]
+              : [],
+          },
+        });
+      } else {
+        await api.startDisplay({ moduleId: prefs.moduleId });
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Start fehlgeschlagen");
@@ -140,6 +210,8 @@ export default function App() {
 
   const running = status?.display.running ?? false;
   const connected = status?.gameSense.connected ?? false;
+  const rotationActive = status?.display.mode === "rotation";
+  const rotationStatus = status?.display.rotation;
 
   return (
     <div className="app">
@@ -228,21 +300,145 @@ export default function App() {
 
         <article className="card wide">
           <h2>Steuerung</h2>
-          <div className="module-row">
-            <label htmlFor="module">Anzeige-Modul</label>
-            <select
-              id="module"
-              value={startModuleId}
-              onChange={(e) => setStartModuleId(e.target.value)}
-              disabled={loading || running}
-            >
-              {(status?.modules ?? []).map((module) => (
-                <option key={module.id} value={module.id}>
-                  {module.name}
-                </option>
-              ))}
-            </select>
+
+          <div className="display-mode-row">
+            <span className="display-mode-label">Anzeige-Modus</span>
+            <div className="display-mode-options">
+              <label className="mode-option">
+                <input
+                  type="radio"
+                  name="display-mode"
+                  value="single"
+                  checked={prefs.mode === "single"}
+                  onChange={() => setDisplayMode("single")}
+                  disabled={loading || running}
+                />
+                Einzelmodul
+              </label>
+              <label className="mode-option">
+                <input
+                  type="radio"
+                  name="display-mode"
+                  value="rotation"
+                  checked={prefs.mode === "rotation"}
+                  onChange={() => setDisplayMode("rotation")}
+                  disabled={loading || running}
+                />
+                Rotation
+              </label>
+            </div>
           </div>
+
+          {prefs.mode === "single" ? (
+            <div className="module-row">
+              <label htmlFor="module">Anzeige-Modul</label>
+              <select
+                id="module"
+                value={prefs.moduleId}
+                onChange={(e) => setStartModuleId(e.target.value)}
+                disabled={loading || running}
+              >
+                {(status?.modules ?? []).map((module) => (
+                  <option key={module.id} value={module.id}>
+                    {module.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="rotation-panel">
+              <p className="section-title">Module in der Rotation</p>
+              <RotationModuleList
+                modules={status?.modules ?? []}
+                selectedIds={prefs.rotation.moduleIds}
+                disabled={loading || running}
+                onChange={setRotationModuleIds}
+              />
+
+              <div className="rotation-settings">
+                <label className="rotation-setting">
+                  <span>Wechsel alle (Sek.)</span>
+                  <input
+                    type="number"
+                    min={5}
+                    max={300}
+                    value={prefs.rotation.intervalSec}
+                    onChange={(e) =>
+                      updatePrefs({
+                        ...prefs,
+                        rotation: {
+                          ...prefs.rotation,
+                          intervalSec: Math.max(
+                            5,
+                            Number(e.target.value) || 15,
+                          ),
+                        },
+                      })
+                    }
+                    disabled={loading || running}
+                  />
+                </label>
+                <label className="rotation-setting">
+                  <span>Event-Anzeige (Sek.)</span>
+                  <input
+                    type="number"
+                    min={5}
+                    max={300}
+                    value={prefs.rotation.eventHoldSec}
+                    onChange={(e) =>
+                      updatePrefs({
+                        ...prefs,
+                        rotation: {
+                          ...prefs.rotation,
+                          eventHoldSec: Math.max(
+                            5,
+                            Number(e.target.value) || 15,
+                          ),
+                        },
+                      })
+                    }
+                    disabled={loading || running}
+                  />
+                </label>
+              </div>
+
+              <label className="rotation-event-option">
+                <input
+                  type="checkbox"
+                  checked={prefs.rotation.onTrackChange}
+                  onChange={(e) =>
+                    updatePrefs({
+                      ...prefs,
+                      rotation: {
+                        ...prefs.rotation,
+                        onTrackChange: e.target.checked,
+                      },
+                    })
+                  }
+                  disabled={loading || running}
+                />
+                <span>Bei neuem Song → Now Playing priorisieren</span>
+              </label>
+            </div>
+          )}
+
+          {running && rotationActive && rotationStatus ? (
+            <p className="hint rotation-status">
+              Rotation aktiv:{" "}
+              {rotationStatus.moduleIds
+                .map(
+                  (id) =>
+                    status?.modules.find((module) => module.id === id)?.name ??
+                    id,
+                )
+                .join(" → ")}{" "}
+              ({rotationStatus.intervalMs / 1000} s) — aktuell{" "}
+              {status?.modules.find(
+                (module) => module.id === rotationStatus.currentModuleId,
+              )?.name ?? rotationStatus.currentModuleId}
+            </p>
+          ) : null}
+
           <div className="controls">
             <button
               type="button"

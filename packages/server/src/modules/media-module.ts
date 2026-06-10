@@ -20,7 +20,8 @@ import {
   queryWindowsMediaSession,
   type WindowsMediaSession,
 } from "../windows/media-session.js";
-import type { DisplayFrame, DisplayModule } from "./types.js";
+import type { OledFrameKind } from "../oled/preview.js";
+import type { DisplayFrame, DisplayModule, DisplayRotationEventId } from "./types.js";
 
 /** OLED + GSMTC + Marquee: alles 1×/s (schont GameDAC). */
 export const MEDIA_REFRESH_INTERVAL_MS = 1_000;
@@ -78,6 +79,9 @@ function toNowPlaying(
 export class MediaModule implements DisplayModule {
   readonly id = "media";
   readonly name = "Now Playing";
+  readonly description = "Aktueller Medientitel von Windows (Spotify, Jellyfin, …).";
+  readonly supportsRotation = true;
+  readonly rotationEvents: DisplayRotationEventId[] = ["media:track-changed"];
   readonly preferredRefreshIntervalMs = MEDIA_REFRESH_INTERVAL_MS;
 
   private cachedSession: WindowsMediaSession = {
@@ -97,6 +101,7 @@ export class MediaModule implements DisplayModule {
   private cached: MediaNowPlaying = toNowPlaying(this.cachedSession, 0);
   private playbackDisplayMs = 0;
   private timelineTrackKey = "";
+  private rotationEventTrackKey = "";
   private marqueeScrollPx = 0;
 
   getScreenHandlers(): ScreenHandler[] {
@@ -142,5 +147,30 @@ export class MediaModule implements DisplayModule {
 
   getCachedNowPlaying(): MediaNowPlaying {
     return toNowPlaying(this.cachedSession, this.playbackDisplayMs);
+  }
+
+  getFrameKind(): OledFrameKind {
+    return "media";
+  }
+
+  async getModuleData(): Promise<MediaNowPlaying> {
+    return this.fetchNowPlaying();
+  }
+
+  async pollRotationEvent(): Promise<DisplayRotationEventId | null> {
+    const session = await queryWindowsMediaSession();
+    const trackKey = mediaTimelineTrackKey(session.title, session.durationMs);
+
+    if (
+      session.available &&
+      this.rotationEventTrackKey !== "" &&
+      trackKey !== this.rotationEventTrackKey
+    ) {
+      this.rotationEventTrackKey = trackKey;
+      return "media:track-changed";
+    }
+
+    this.rotationEventTrackKey = trackKey;
+    return null;
   }
 }

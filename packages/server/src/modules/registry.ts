@@ -1,6 +1,7 @@
-import type { DisplayModule } from "./types.js";
+import type { DisplayModule, DisplayModuleInfo } from "./types.js";
 import { IpModule } from "./ip-module.js";
 import { MediaModule } from "./media-module.js";
+import { TemplateModule } from "./template-module.js";
 
 export class ModuleRegistry {
   private readonly modules = new Map<string, DisplayModule>();
@@ -8,6 +9,7 @@ export class ModuleRegistry {
   constructor() {
     this.register(new IpModule());
     this.register(new MediaModule());
+    this.register(new TemplateModule());
   }
 
   register(module: DisplayModule): void {
@@ -26,10 +28,13 @@ export class ModuleRegistry {
     return ip;
   }
 
-  list(): Array<{ id: string; name: string }> {
+  list(): DisplayModuleInfo[] {
     return [...this.modules.values()].map((m) => ({
       id: m.id,
       name: m.name,
+      description: m.description,
+      supportsRotation: m.supportsRotation,
+      rotationEvents: m.rotationEvents,
     }));
   }
 }
