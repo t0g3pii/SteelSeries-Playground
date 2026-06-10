@@ -1,3 +1,4 @@
+import type { MediaNowPlaying } from "../modules/media-module.js";
 import type { IpModule } from "../modules/ip-module.js";
 import {
   devicePreviewMaskBelowY,
@@ -12,6 +13,7 @@ export const OLED_PREVIEW_HEIGHT = 64;
 export type OledFrameKind =
   | "idle"
   | "ip"
+  | "media"
   | "feature-test"
   | "progress-bar-test"
   | "gauge-test"
@@ -43,12 +45,22 @@ export interface OledPreviewResponse {
   activeDisplayMode: "bitmap" | "text";
   frameKind: OledFrameKind;
   componentTestId: ComponentTestId | null;
+  media: MediaNowPlaying | null;
   running: boolean;
   lan: string;
   wan: string;
   /** Gesendeter GameSense-Frame (128×64); Geräteansicht nutzt displayHeight. */
   bitmap: number[];
   lines: { lan: string; wan: string };
+}
+
+export interface OledPreviewParams {
+  ipModule: IpModule;
+  media: MediaNowPlaying | null;
+  running: boolean;
+  frameKind: OledFrameKind;
+  lastFrame: Record<string, unknown> | null;
+  componentTestId?: ComponentTestId | null;
 }
 
 function bitmapFromFrame(
@@ -59,13 +71,16 @@ function bitmapFromFrame(
   return Array.isArray(data) ? (data as number[]) : null;
 }
 
-export function buildOledPreview(
-  ipModule: IpModule,
-  running: boolean,
-  frameKind: OledFrameKind,
-  lastFrame: Record<string, unknown> | null,
-  componentTestId: ComponentTestId | null = null,
-): OledPreviewResponse {
+export function buildOledPreview(params: OledPreviewParams): OledPreviewResponse {
+  const {
+    ipModule,
+    media,
+    running,
+    frameKind,
+    lastFrame,
+    componentTestId = null,
+  } = params;
+
   const { lan, wan } = ipModule.getCachedIps();
   const activeDisplayMode = ipModule.getDisplayMode();
   const formatted = buildTextFrame(lan, wan);
@@ -102,6 +117,7 @@ export function buildOledPreview(
     activeDisplayMode,
     frameKind: kind,
     componentTestId: running ? componentTestId : null,
+    media: running && frameKind === "media" ? media : null,
     running,
     lan,
     wan,

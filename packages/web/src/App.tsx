@@ -8,10 +8,7 @@ import {
 } from "./api";
 import { OledLivePreview } from "./components/OledLivePreview";
 import type { FeatureTestInfo } from "./feature-test";
-import {
-  FAST_PREVIEW_INTERVAL_MS,
-  isOledTestFrame,
-} from "./oled-preview-poll";
+import { getOledPreviewPollIntervalMs } from "./oled-preview-poll";
 import "./App.css";
 
 function formatTime(iso: string | null): string {
@@ -30,7 +27,6 @@ function formatDurationMs(ms: number): string {
 export default function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [ips, setIps] = useState<IpResponse | null>(null);
-  const [intervalInput, setIntervalInput] = useState("30");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deadzone, setDeadzone] = useState<DeadzoneInfo | null>(null);
@@ -38,6 +34,7 @@ export default function App() {
   const [oledPreview, setOledPreview] = useState<OledPreviewResponse | null>(
     null,
   );
+  const [startModuleId, setStartModuleId] = useState("ip");
 
   const load = useCallback(async () => {
     try {
@@ -54,7 +51,6 @@ export default function App() {
       setDeadzone(deadzoneData);
       setOledPreview(previewData);
       setFeatureTest(featureTestData);
-      setIntervalInput(String(Math.round(ipData.refreshIntervalMs / 1000)));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Laden fehlgeschlagen");
@@ -68,15 +64,19 @@ export default function App() {
   }, [load]);
 
   useEffect(() => {
-    if (!oledPreview?.running || !isOledTestFrame(oledPreview.frameKind)) {
-      return;
-    }
+    const pollMs = oledPreview
+      ? getOledPreviewPollIntervalMs(
+          oledPreview.frameKind,
+          oledPreview.running,
+        )
+      : null;
+    if (!pollMs) return;
 
     void api.getOledPreview().then(setOledPreview).catch(() => {});
 
     const poll = setInterval(() => {
       void api.getOledPreview().then(setOledPreview).catch(() => {});
-    }, FAST_PREVIEW_INTERVAL_MS);
+    }, pollMs);
 
     return () => clearInterval(poll);
   }, [oledPreview?.running, oledPreview?.frameKind]);
@@ -85,7 +85,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      await api.startDisplay("ip");
+      await api.startDisplay(startModuleId);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Start fehlgeschlagen");
@@ -135,25 +135,6 @@ export default function App() {
     } finally {
       setLoading(false);
       setTimeout(() => void load(), totalMs + 500);
-    }
-  }
-
-  async function handleSaveInterval() {
-    const seconds = Number(intervalInput);
-    if (!Number.isFinite(seconds) || seconds < 5) {
-      setError("Intervall muss mindestens 5 Sekunden betragen");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      await api.setIpConfig(seconds * 1000);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -210,20 +191,58 @@ export default function App() {
           ) : (
             <p className="hint">OLED-Vorschau wird geladen…</p>
           )}
-          <dl className="oled-ip-meta">
-            <div>
-              <dt>LAN</dt>
-              <dd>{ips?.lan ?? oledPreview?.lan ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>WAN</dt>
-              <dd>{ips?.wan ?? oledPreview?.wan ?? "—"}</dd>
-            </div>
-          </dl>
+          {oledPreview?.frameKind === "media" && oledPreview.media ? (
+            <dl className="oled-ip-meta">
+              <div>
+                <dt>Titel</dt>
+                <dd>{oledPreview.media.title || "—"}</dd>
+              </div>
+              <div>
+                <dt>Interpret</dt>
+                <dd>{oledPreview.media.artist || "—"}</dd>
+              </div>
+              {oledPreview.media.timeline ? (
+                <div>
+                  <dt>Zeit</dt>
+                  <dd>{oledPreview.media.timeline}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>App</dt>
+                <dd>{oledPreview.media.appLabel || "—"}</dd>
+              </div>
+            </dl>
+          ) : (
+            <dl className="oled-ip-meta">
+              <div>
+                <dt>LAN</dt>
+                <dd>{ips?.lan ?? oledPreview?.lan ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>WAN</dt>
+                <dd>{ips?.wan ?? oledPreview?.wan ?? "—"}</dd>
+              </div>
+            </dl>
+          )}
         </article>
 
         <article className="card wide">
           <h2>Steuerung</h2>
+          <div className="module-row">
+            <label htmlFor="module">Anzeige-Modul</label>
+            <select
+              id="module"
+              value={startModuleId}
+              onChange={(e) => setStartModuleId(e.target.value)}
+              disabled={loading || running}
+            >
+              {(status?.modules ?? []).map((module) => (
+                <option key={module.id} value={module.id}>
+                  {module.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="controls">
             <button
               type="button"
@@ -270,26 +289,6 @@ export default function App() {
             </p>
           )}
 
-          <div className="interval-row">
-            <label htmlFor="interval">Aktualisierungsintervall (Sekunden)</label>
-            <div className="interval-controls">
-              <input
-                id="interval"
-                type="number"
-                min={5}
-                max={300}
-                value={intervalInput}
-                onChange={(e) => setIntervalInput(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => void handleSaveInterval()}
-                disabled={loading}
-              >
-                Speichern
-              </button>
-            </div>
-          </div>
         </article>
       </section>
     </div>

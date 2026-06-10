@@ -34,9 +34,36 @@ export interface DeadzoneInfo {
   screens: Array<{ key: string; width: number; height: number }>;
 }
 
+export type MediaAppIconId =
+  | "spotify"
+  | "chrome"
+  | "firefox"
+  | "opera"
+  | "vlc"
+  | "jellyfin"
+  | "edge"
+  | "media";
+
+export interface MediaNowPlaying {
+  available: boolean;
+  title: string;
+  artist: string;
+  album: string;
+  status: string;
+  appName: string;
+  appIcon: MediaAppIconId;
+  appLabel: string;
+  hasTimeline: boolean;
+  positionMs: number;
+  durationMs: number;
+  timeline: string | null;
+  error: string | null;
+}
+
 export type OledFrameKind =
   | "idle"
   | "ip"
+  | "media"
   | "feature-test"
   | "progress-bar-test"
   | "gauge-test"
@@ -55,6 +82,7 @@ export interface OledPreviewResponse {
   activeDisplayMode: "bitmap" | "text";
   frameKind: OledFrameKind;
   componentTestId: ComponentTestId | null;
+  media: MediaNowPlaying | null;
   running: boolean;
   lan: string;
   wan: string;
@@ -104,12 +132,8 @@ export const api = {
       body: JSON.stringify({ id }),
     }),
   getIps: () => request<IpResponse>("/api/modules/ip"),
-  setIpConfig: (refreshIntervalMs: number) =>
-    request<{ ok: boolean; refreshIntervalMs: number }>(
-      "/api/modules/ip/config",
-      {
-        method: "PUT",
-        body: JSON.stringify({ refreshIntervalMs }),
-      },
+  getMedia: () =>
+    request<MediaNowPlaying & { refreshIntervalMs: number }>(
+      "/api/modules/media",
     ),
 };

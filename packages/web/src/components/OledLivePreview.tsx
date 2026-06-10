@@ -18,6 +18,7 @@ function frameKindLabel(preview: OledPreviewResponse): string {
   if (preview.activeDisplayMode === "text" && preview.running) {
     return "Text auf GameDAC";
   }
+  if (preview.frameKind === "media") return "Now Playing";
   if (preview.frameKind === "ip") return "IP-Anzeige";
   if (!preview.running) return "Offline";
   return "Vorschau";

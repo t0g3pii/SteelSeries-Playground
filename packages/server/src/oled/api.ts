@@ -48,6 +48,7 @@ import {
   gaugeInfo,
 } from "./gauge.js";
 import { buildLineTestFrame, lineTestInfo } from "./line-test.js";
+import { buildMediaFrame, MEDIA_COVER_SIZE_PX } from "./media-frame.js";
 import { OLED_LAYOUT_CONTRACT } from "./layout-contract.js";
 import {
   MARQUEE_PIXELS_PER_STEP,
@@ -118,6 +119,7 @@ export {
   buildGaugeFrame,
   buildImageFrame,
   buildLineTestFrame,
+  buildMediaFrame,
   buildMarqueeFrame,
   buildOfflineFrame,
   buildPixelCheckFrame,
@@ -157,6 +159,7 @@ export {
   lineTopOffset,
   MARQUEE_PIXELS_PER_STEP,
   MARQUEE_TEXT,
+  MEDIA_COVER_SIZE_PX,
   maxTextLines,
   OLED_BITMAP_LINE_MAX,
   OLED_TEXT_LINE_MAX,

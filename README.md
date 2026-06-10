@@ -64,7 +64,7 @@ Die gebaute Web-UI wird dann vom API-Server unter `http://localhost:3000` ausgel
 | POST | `/api/display/stop` | OLED-Aktualisierung stoppen |
 | POST | `/api/display/refresh` | Sofort aktualisieren |
 | GET | `/api/modules/ip` | Aktuelle LAN/WAN-IPs |
-| PUT | `/api/modules/ip/config` | Intervall konfigurieren |
+| GET | `/api/modules/media` | Windows Now Playing (Titel, Interpret, Cover) |
 | GET | `/api/oled/components` | Verfügbare OLED-UI-Komponenten (Discovery) |
 | GET | `/api/display/feature-test` | Feature-Test-Dauer und Phasen |
 | POST | `/api/display/feature-test` | Komplette OLED-Demo-Sequenz starten |

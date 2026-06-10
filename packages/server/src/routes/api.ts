@@ -12,6 +12,7 @@ import {
 import { isComponentTestId } from "../oled/component-tests.js";
 import { getDeadzoneInfo } from "../oled/deadzone.js";
 import type { IpModule } from "../modules/ip-module.js";
+import type { MediaModule } from "../modules/media-module.js";
 
 export function createApiRouter(
   gameSense: GameSenseClient,
@@ -188,16 +189,16 @@ export function createApiRouter(
     });
   });
 
-  router.put("/modules/ip/config", (req: Request, res: Response) => {
-    const interval = Number(req.body?.refreshIntervalMs);
-    if (!Number.isFinite(interval)) {
-      res.status(400).json({ error: "refreshIntervalMs muss eine Zahl sein" });
+  router.get("/modules/media", async (_req: Request, res: Response) => {
+    const mediaModule = registry.get("media") as MediaModule | undefined;
+    if (!mediaModule) {
+      res.status(404).json({ error: "Medien-Modul nicht gefunden" });
       return;
     }
 
-    displayManager.setRefreshIntervalMs(interval);
+    const nowPlaying = await mediaModule.fetchNowPlaying();
     res.json({
-      ok: true,
+      ...nowPlaying,
       refreshIntervalMs: displayManager.getRefreshIntervalMs(),
     });
   });

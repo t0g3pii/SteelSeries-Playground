@@ -8,6 +8,7 @@ import {
   buildTextFrame,
   getTextScreenHandlers,
 } from "../oled/text-handler.js";
+import { DEFAULT_REFRESH_INTERVAL_MS } from "../config.js";
 import type { DisplayFrame, DisplayModule } from "./types.js";
 
 const WAN_TIMEOUT_MS = 5_000;
@@ -44,6 +45,7 @@ async function getExternalIpv4(): Promise<string> {
 export class IpModule implements DisplayModule {
   readonly id = "ip";
   readonly name = "IP-Anzeige";
+  readonly preferredRefreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS;
 
   private cachedLan = "---";
   private cachedWan = "---";

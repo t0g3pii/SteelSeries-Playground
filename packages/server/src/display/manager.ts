@@ -18,7 +18,8 @@ import {
 } from "../oled/preview.js";
 import { buildOfflineFrame } from "../oled/renderer.js";
 import type { IpModule } from "../modules/ip-module.js";
-import type { DisplayFrame } from "../modules/types.js";
+import type { MediaModule } from "../modules/media-module.js";
+import type { DisplayFrame, DisplayModule } from "../modules/types.js";
 import {
   startFeatureTest,
   type FeatureTestRunner,
@@ -85,7 +86,7 @@ export class DisplayManager {
   }
 
   setRefreshIntervalMs(ms: number): void {
-    this.refreshIntervalMs = Math.max(5_000, Math.min(ms, 300_000));
+    this.refreshIntervalMs = Math.max(50, Math.min(ms, 300_000));
 
     if (this.running) {
       this.restartRefreshTimer();
@@ -135,6 +136,10 @@ export class DisplayManager {
     this.lastError = null;
     this.oledFrameKind = "idle";
     this.lastFrame = null;
+
+    if (module.preferredRefreshIntervalMs) {
+      this.setRefreshIntervalMs(module.preferredRefreshIntervalMs);
+    }
 
     await this.pushUpdate();
 
@@ -278,6 +283,7 @@ export class DisplayManager {
         activeDisplayMode: "bitmap",
         frameKind: "idle",
         componentTestId: null,
+        media: null,
         running: this.running,
         lan: "---",
         wan: "---",
@@ -286,13 +292,16 @@ export class DisplayManager {
       };
     }
 
-    return buildOledPreview(
+    const mediaModule = this.registry.get("media") as MediaModule | undefined;
+
+    return buildOledPreview({
       ipModule,
-      this.running,
-      this.oledFrameKind,
-      this.lastFrame,
-      this.componentTestId,
-    );
+      media: mediaModule?.getCachedNowPlaying() ?? null,
+      running: this.running,
+      frameKind: this.oledFrameKind,
+      lastFrame: this.lastFrame,
+      componentTestId: this.componentTestId,
+    });
   }
 
   private restartRefreshTimer(): void {
@@ -336,6 +345,14 @@ export class DisplayManager {
     });
   }
 
+  private resolveFrameKind(moduleId: string, module: DisplayModule): OledFrameKind {
+    if (moduleId === "media") {
+      return "media";
+    }
+    const ipModule = module as IpModule;
+    return ipModule.getDisplayMode?.() === "text" ? "text" : "ip";
+  }
+
   private assertBitmapMode(): void {
     const ipModule = this.registry.get("ip") as IpModule | undefined;
     if (ipModule?.getDisplayMode() === "text") {
@@ -357,9 +374,7 @@ export class DisplayManager {
       return;
     }
 
-    const ipModule = module as IpModule;
-    this.oledFrameKind =
-      ipModule.getDisplayMode?.() === "text" ? "text" : "ip";
+    this.oledFrameKind = this.resolveFrameKind(this.activeModuleId, module);
 
     const frame = await module.getFrame();
     await this.sendFrame(frame);

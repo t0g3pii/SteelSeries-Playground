@@ -1,11 +1,13 @@
 import type { DisplayModule } from "./types.js";
 import { IpModule } from "./ip-module.js";
+import { MediaModule } from "./media-module.js";
 
 export class ModuleRegistry {
   private readonly modules = new Map<string, DisplayModule>();
 
   constructor() {
     this.register(new IpModule());
+    this.register(new MediaModule());
   }
 
   register(module: DisplayModule): void {

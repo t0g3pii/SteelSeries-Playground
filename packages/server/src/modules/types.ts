@@ -9,8 +9,6 @@ export interface DisplayModule {
   name: string;
   getFrame(): Promise<DisplayFrame>;
   getScreenHandlers(): ScreenHandler[];
-}
-
-export interface ModuleConfig {
-  refreshIntervalMs: number;
+  /** Optional: DisplayManager setzt Intervall beim Start. */
+  preferredRefreshIntervalMs?: number;
 }
