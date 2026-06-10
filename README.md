@@ -1,140 +1,239 @@
-# GameDAC Dashboard
+# SteelSeries Playground
 
-Lokale Web-Plattform zur Steuerung der OLED-Anzeige auf dem SteelSeries Arctis Nova Pro Wireless GameDAC über die [GameSense API](https://github.com/SteelSeries/gamesense-sdk).
+Steuere die OLED-Anzeige deines **Arctis Nova Pro Wireless GameDAC** über eine lokale Web-UI — powered by [SteelSeries GameSense](https://github.com/SteelSeries/gamesense-sdk).
 
-## Voraussetzungen
+Zeig LAN/WAN-IPs, Now Playing von Spotify & Co., oder baue eigene Module mit der OLED Component API. Alles läuft lokal auf deinem PC, ohne Cloud.
 
-- Windows 10/11
-- [Node.js](https://nodejs.org/) **20 LTS** (empfohlen, siehe `.nvmrc`)
-- [SteelSeries GG](https://steelseries.com/gg) läuft
-- GameDAC ist verbunden
-- `coreProps.json` existiert unter:
-  `%ProgramData%\SteelSeries\SteelSeries Engine 3\coreProps.json`
+---
 
-## Installation
+## Features
 
-**Windows — [nvm-windows](https://github.com/coreybutler/nvm-windows)** (nicht das npm-Paket `nvm`!):
+- **Web-Dashboard** — Live-Vorschau des OLED-Inhalts, Start/Stop, Einstellungen werden im Browser gespeichert
+- **Display-Module** — IP-Anzeige, Now Playing (Windows Media Session), Template-Uhr; erweiterbar per Plugin
+- **Einzelmodul oder Rotation** — Module nacheinander anzeigen, Reihenfolge per Drag & Drop
+- **Modul-Events** — z. B. bei neuem Song Now Playing priorisieren, zur vollen Stunde die Uhr (⚙ pro Modul)
+- **Live-Umstellung** — Modus, Module und Rotation während des Laufens ändern, ohne Neustart
+- **OLED Component API** — wiederverwendbare Bausteine (Gauge, Uhr, Marquee, …) für eigene Frames
+
+---
+
+## Schnellstart
+
+### Voraussetzungen
+
+| | |
+|---|---|
+| OS | Windows 10/11 |
+| Node.js | **20 LTS** (siehe `.nvmrc`) |
+| Software | [SteelSeries GG](https://steelseries.com/gg) läuft |
+| Hardware | GameDAC verbunden |
+| GameSense | `%ProgramData%\SteelSeries\SteelSeries Engine 3\coreProps.json` existiert |
+
+### Installation
 
 ```powershell
+# Mit nvm-windows (empfohlen)
 nvm install 20
 nvm use 20
-node --version   # sollte v20.x zeigen
 npm install
 ```
 
-Falls `nvm` die Meldung *„This is not the package you are looking for“* zeigt, ist das falsche npm-Paket im PATH. Dann direkt:
+Ohne nvm: [Node.js 20 LTS](https://nodejs.org/) installieren, dann `npm install` im Repo-Root.
 
-```powershell
-& "$env:LOCALAPPDATA\nvm\nvm.exe" install 20
-& "$env:LOCALAPPDATA\nvm\nvm.exe" use 20
-```
+> **nvm-Hinweis:** Das npm-Paket `nvm` ist *nicht* nvm-windows. Bei der Meldung *„This is not the package you are looking for“* direkt `nvm.exe` aus `%LOCALAPPDATA%\nvm\` nutzen.
 
-Optional das Störpaket entfernen: `npm uninstall -g nvm`
-
-**Ohne nvm:** [Node.js 20 LTS](https://nodejs.org/) installieren, dann `npm install`.
-
-## Entwicklung starten
+### Starten
 
 ```bash
 npm run dev
 ```
 
-Das startet:
+| Dienst | URL |
+|--------|-----|
+| Web-UI (Entwicklung) | http://localhost:5173 |
+| API-Server | http://localhost:3000 |
 
-- **API-Server** auf `http://localhost:3000`
-- **Web-UI** auf `http://localhost:5173` (mit API-Proxy)
+Im Dashboard **Start** klicken — die Anzeige erscheint auf dem GameDAC. Unter **GameSense Apps** in GG sollte `GAMEDAC_DASHBOARD` sichtbar sein.
 
-Öffne die Web-UI im Browser, klicke auf **Start**, und die LAN-/WAN-IP erscheint auf dem GameDAC-OLED.
-
-## Produktion
+### Produktion
 
 ```bash
 npm run build
 npm start
 ```
 
-Die gebaute Web-UI wird dann vom API-Server unter `http://localhost:3000` ausgeliefert.
+Web-UI und API laufen dann gemeinsam unter http://localhost:3000.
 
-## API-Endpunkte
+---
+
+## Dashboard
+
+| Bereich | Funktion |
+|---------|----------|
+| **Live-Ansicht** | 128×52-Geräteansicht + Modul-Metadaten (Titel, IPs, Uhrzeit, …) |
+| **Einzelmodul** | Ein Modul dauerhaft anzeigen; Wechsel auch während des Laufens |
+| **Rotation** | Mehrere Module in Reihenfolge; Wechsel-Intervall und Event-Dauer einstellbar |
+| **Modul-⚙** | Pro-Modul-Einstellungen (Events, Priorisierung) im Popup |
+| **Feature-Test** | OLED-Demo-Sequenz — belastet das DAC stark, nur zum Testen |
+
+Einstellungen (Modus, Module, Rotation, Events) werden in `localStorage` gehalten und beim Laden mit dem laufenden Server abgeglichen.
+
+---
+
+## Eingebaute Module
+
+| ID | Name | Kurzbeschreibung |
+|----|------|------------------|
+| `ip` | IP-Anzeige | LAN- und WAN-IP (statisch in Rotation, 1 Frame pro Slot) |
+| `media` | Now Playing | Titel, Artist, App-Icon, Zeit — Spotify, Jellyfin, … via Windows GSMTC |
+| `template` | Template (Uhr) | Beispiel-Modul / Vorlage für eigene Anzeigen |
+
+Neues Modul: [`packages/server/src/modules/README.md`](packages/server/src/modules/README.md) und `template-module.ts`.
+
+---
+
+## Projektstruktur
+
+```
+SteelSeries-Playground/
+├── packages/
+│   ├── server/                 # Express API + GameSense + OLED-Rendering
+│   │   └── src/
+│   │       ├── routes/         # REST: display, modules, oled
+│   │       ├── modules/        # Display-Module (Plugins)
+│   │       ├── oled/           # Frame-Builder, Layout, Fonts
+│   │       └── display/        # DisplayManager, Rotation
+│   └── web/                    # React-Dashboard (Vite)
+├── docs/
+│   └── OLED-API.md             # Frame-Builder-Referenz
+└── .cursor/rules/
+    └── oled-layout.mdc         # Layout-Vertrag für Agents
+```
+
+---
+
+## API (Überblick)
+
+Basis-URL: `http://localhost:3000/api`
+
+### Display
 
 | Methode | Pfad | Beschreibung |
 |---------|------|--------------|
-| GET | `/api/status` | Verbindungs- und Display-Status |
-| POST | `/api/display/start` | Start: `{ moduleId }` oder `{ rotation: { moduleIds, intervalMs, eventHoldMs, events } }` |
-| POST | `/api/display/stop` | OLED-Aktualisierung stoppen |
-| POST | `/api/display/refresh` | Sofort aktualisieren |
-| GET | `/api/modules` | Alle registrierten Display-Module |
-| GET | `/api/modules/:id` | Modul-Daten (z. B. `ip`, `media`) |
-| GET | `/api/oled/components` | Verfügbare OLED-UI-Komponenten (Discovery) |
-| GET | `/api/display/feature-test` | Feature-Test-Dauer und Phasen |
-| POST | `/api/display/feature-test` | Komplette OLED-Demo-Sequenz starten |
+| GET | `/status` | GG-Verbindung, Display-Status, Modulliste |
+| POST | `/display/start` | Starten: `{ moduleId }` oder `{ rotation: { … } }` |
+| POST | `/display/stop` | Anzeige stoppen |
+| POST | `/display/configure` | Live: Modus, Rotation oder Modul ändern |
+| POST | `/display/switch` | Live: anderes Modul (Einzelmodus) |
+| GET | `/display/preview` | OLED-Bitmap + Metadaten für die Web-UI |
 
-## Troubleshooting
+**Rotation-Body (Beispiel):**
 
-### „GG offline“ / coreProps.json nicht gefunden
-
-- SteelSeries GG starten und warten, bis es vollständig geladen ist
-- Prüfen, ob `%ProgramData%\SteelSeries\SteelSeries Engine 3\coreProps.json` existiert
-
-### OLED zeigt nichts an
-
-- GameDAC muss verbunden sein
-- In SteelSeries GG unter **GameSense Apps** sollte `GAMEDAC_DASHBOARD` erscheinen
-- Auf **Start** in der Web-UI klicken
-- GG ggf. neu starten und erneut **Start** klicken (Handler muss neu gebunden werden)
-
-### IPs ändern sich nicht
-
-- Das IP-Modul nutzt `value_optional: true`, damit auch gleichbleibende Werte aktualisiert werden
-- **Jetzt aktualisieren** erzwingt ein sofortiges Update
-
-## Architektur
-
-```
-packages/server
-  src/routes/     REST-API (display, modules, oled)
-  src/modules/    Display-Module / Plugins (ip, media, template, …)
-  src/oled/       OLED Component API (Frame-Builder, Layout)
-  src/display/    DisplayManager + Rotation
-packages/web      React Dashboard (Einstellungen in localStorage)
+```json
+{
+  "rotation": {
+    "moduleIds": ["ip", "media", "template"],
+    "intervalMs": 15000,
+    "eventHoldMs": 15000,
+    "events": ["media:track-changed"]
+  }
+}
 ```
 
-Neue Anzeige-Module: `packages/server/src/modules/README.md` und `template-module.ts` als Vorlage.  
-OLED-Bausteine für Module: `docs/OLED-API.md` und `packages/server/src/oled/api.ts`.
+Events werden aus den Modul-Einstellungen (⚙) abgeleitet. Verfügbar u. a.: `media:track-changed`, `template:full-hour`.
 
-### OLED Layout Contract (verbindlich)
+### Module & OLED
 
-Empirisch am **Arctis Nova Pro Wireless GameDAC** gemessen (Pixel-Checker, Zeilen-Test, Deadzone-Ecken). **Nicht ändern** ohne erneute Hardware-Messung.
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| GET | `/modules` | Registrierte Module inkl. `rotationSettings` |
+| GET | `/modules/:id` | Modul-Daten (z. B. Now Playing, IPs) |
+| GET | `/oled/components` | Verfügbare UI-Komponenten (Discovery) |
 
-| | Maße |
-|---|---|
-| **Gesendet** (GameSense) | **128×64** (`image-data-128x64`) |
-| **Sichtbar** (Gerät & Live-Ansicht) | **128×52** (Y=0…51) |
-| **Text-Padding** | 2px oben + unten |
-| **Max. Textzeilen** | 6 (6×8-Font) |
+Weitere Test-Endpunkte (`/display/feature-test`, …) siehe `packages/server/src/routes/display.ts`.
 
-Single Source of Truth: `packages/server/src/oled/layout-contract.ts`  
-Layout-Helfer: `packages/server/src/oled/deadzone.ts`
+---
 
-**OLED Component API** (Frame-Builder für Module & Features): [`docs/OLED-API.md`](docs/OLED-API.md)  
-Einstieg im Code: `packages/server/src/oled/api.ts`
+## OLED & Layout
 
-Dashboard: **Feature-Test** (Pixel-Check, Zeilen, Deadzone, Progressbar, Gauge, alle UI-Komponenten)
+Am **Arctis Nova Pro Wireless GameDAC** gemessen — **nicht ändern** ohne erneute Hardware-Messung.
 
-### OLED-Rendering
+| | Maß |
+|---|-----|
+| Gesendet (GameSense) | **128×64** |
+| Sichtbar auf dem Gerät | **128×52** (Y = 0…51) |
+| Text | 6×8-Font, max. 6 Zeilen, 2 px Padding oben/unten |
 
-Standard: **Bitmap** (6×8-Font, Display-Logik aus [steelseries-screen-controller](https://github.com/Aidan647/SteelSeries-Screen-Controller), Font-Glyphen aus [oled-font-pack](https://www.npmjs.com/package/oled-font-pack)). GameSense erhält 128×64; Layout und Geräteansicht halten sich an den **128×52**-Vertrag oben. Zusätzlich `image-data-128x52` für Legacy-GameDAC.
+- Layout-Vertrag: `packages/server/src/oled/layout-contract.ts`
+- Frame-Builder: [`docs/OLED-API.md`](docs/OLED-API.md) · Einstieg: `packages/server/src/oled/api.ts`
+- Umlaute: Bitmap nur ASCII → `ä/ö/ü` werden als `ae/oe/ue` gerendert; Web-UI zeigt UTF-8
 
-Fallback auf GameSense-Text (größere Systemschrift):
+**Bitmap-Modus** (Standard) nutzt eine lokale Display-Klasse (abgeleitet von [steelseries-screen-controller](https://github.com/Aidan647/SteelSeries-Screen-Controller)) und [oled-font-pack](https://www.npmjs.com/package/oled-font-pack).
+
+Text-Fallback (größere GG-Systemschrift):
 
 ```bash
 set DISPLAY_MODE=text
 npm start
 ```
 
-Die LAN-IP bevorzugt Ethernet vor WLAN und ignoriert Tailscale/VPN-Adressen (100.64.0.0/10).
+> Node **20 LTS** empfohlen — `steelseries-screen-controller` (native Binaries) ist unter Node 24 problematisch.
 
-> **Hinweis:** Das npm-Paket `steelseries-screen-controller` benötigt native `node-libpng`-Binaries und läuft nicht unter Node 24. Deshalb ist die Display-Klasse lokal eingebunden; das Rendering ist identisch. Node 20 LTS wird für Stabilität empfohlen.
+---
+
+## Troubleshooting
+
+<details>
+<summary><strong>„GG offline“ / coreProps.json fehlt</strong></summary>
+
+- SteelSeries GG vollständig starten lassen
+- Prüfen: `%ProgramData%\SteelSeries\SteelSeries Engine 3\coreProps.json`
+</details>
+
+<details>
+<summary><strong>OLED bleibt leer</strong></summary>
+
+- GameDAC verbunden?
+- In der Web-UI **Start** geklickt?
+- GG neu starten, erneut **Start** (GameSense-Handler werden neu gebunden)
+- Unter **GameSense Apps** muss `GAMEDAC_DASHBOARD` erscheinen
+</details>
+
+<details>
+<summary><strong>Now Playing zeigt nichts / falsche Zeichen</strong></summary>
+
+- Windows muss eine aktive Medien-Session haben (Spotify, Jellyfin, …)
+- Umlaute auf dem DAC: Transliteration (`Wuerdest` statt `Würdest`) — Font-Limitation
+- Web-Meta sollte korrekte UTF-8-Titel zeigen
+</details>
+
+<details>
+<summary><strong>Rotation / Events reagieren nicht</strong></summary>
+
+- Modul per ⚙ konfiguriert und Event aktiviert?
+- `media` bzw. `template` muss in der Rotations-Liste stehen
+- Server-Log / `lastError` im Dashboard prüfen
+</details>
+
+---
+
+## Entwicklung
+
+```bash
+npm run dev      # Server + Web mit Hot Reload
+npm run build    # TypeScript + Vite Production Build
+```
+
+| Workspace | Package | Beschreibung |
+|-----------|---------|--------------|
+| `packages/server` | `@gamedac/server` | API, GameSense-Client, Module |
+| `packages/web` | `@gamedac/web` | React-Dashboard |
+
+**Neues Display-Modul:** `template-module.ts` kopieren → in `registry.ts` registrieren → optional `rotationSettings` + `pollRotationEvent`.
+
+**Neuer OLED-Baustein:** Builder in `packages/server/src/oled/` — in [`docs/OLED-API.md`](docs/OLED-API.md) dokumentieren und über `oled/api.ts` exportieren.
+
+---
 
 ## Lizenz
 
