@@ -205,7 +205,7 @@ const session = await queryWindowsMediaSession();
 buildMediaFrame({ session, scrollTick: 0 });
 ```
 
-Layout: **40×40 App-Icon** links ohne Rahmen (Spotify mit drei Schallwellen, Chrome, Firefox, Opera, VLC, Jellyfin, Edge, Fallback), **Titel** und **Interpret** rechts, optional **Zeit** (`mm:ss/mm:ss`) nur bei **Spotify** und **Jellyfin** — 3. Zeile (mit Artist) bzw. 2. Zeile (ohne Artist). Lange Texte scrollen als Marquee (geclippt, **6 px/s**, 1 Update/s). Windows-Abfrage inkl. Timeline via `packages/server/scripts/query-windows-media.ps1`.
+Layout: **40×40 App-Icon** links ohne Rahmen (Spotify mit drei Schallwellen, Chrome, Firefox, Opera, VLC, Jellyfin, Edge, Fallback), **Titel** und **Interpret** rechts, optional **Zeit** (`mm:ss/mm:ss`) nur bei **Spotify** und **Jellyfin** — 3. Zeile (mit Artist) bzw. 2. Zeile (ohne Artist). Lange Texte scrollen als Marquee (geclippt, **6 px/s**, 1 Update/s). Windows-Abfrage inkl. Timeline via `packages/server/scripts/query-windows-media.ps1`. **Umlaute:** 6×8-Font nur ASCII — Bitmap-Rendering nutzt `sanitizeOledText()` (ä→ae, ö→oe, ü→ue); API/Web behalten Original-UTF-8.
 
 Display-Modul: `MediaModule` (`id: "media"`) — **1×/s** (OLED, GSMTC, Marquee). Zeit: lokaler **+1 s/Tick**; API-Sync bei Trackwechsel/Pause, Zurückspulen (≥1 s) oder >10 s Rückstand.
 

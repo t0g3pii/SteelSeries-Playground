@@ -1,10 +1,11 @@
 import type { Display } from "./display.js";
 import type { OledFont } from "./oled-font.js";
+import { sanitizeOledText } from "./text-sanitize.js";
 
 const MARQUEE_GAP = "   ";
 
 export function textWidthPx(text: string, font: OledFont): number {
-  return text.length * font.width;
+  return sanitizeOledText(text).length * font.width;
 }
 
 export function textFitsInWidth(
@@ -57,7 +58,7 @@ export function drawMarqueeLine(
   scrollTick: number,
   pixelsPerStep = 1,
 ): void {
-  const trimmed = text.trim();
+  const trimmed = sanitizeOledText(text.trim());
   if (!trimmed) return;
 
   const clipRight = x + maxWidthPx;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   api,
   type OledPreviewResponse,
+  type StartDisplayBody,
   type StatusResponse,
 } from "./api";
 import { FlipSwitch } from "./components/FlipSwitch";
@@ -43,8 +44,53 @@ export default function App() {
     saveDisplayPreferences(next);
   }
 
-  function setDisplayMode(mode: DisplayUiMode) {
-    updatePrefs({ ...prefs, mode });
+  function displayBodyFromPrefs(
+    next: DisplayPreferences,
+  ): StartDisplayBody {
+    if (next.mode === "rotation") {
+      return {
+        rotation: {
+          moduleIds: next.rotation.moduleIds,
+          intervalMs: next.rotation.intervalSec * 1000,
+          eventHoldMs: next.rotation.eventHoldSec * 1000,
+          events: next.rotation.onTrackChange
+            ? ["media:track-changed"]
+            : [],
+        },
+      };
+    }
+    return { moduleId: next.moduleId };
+  }
+
+  async function applyDisplayConfig(next: DisplayPreferences) {
+    if (next.mode === "rotation" && next.rotation.moduleIds.length === 0) {
+      throw new Error("Mindestens ein Modul für die Rotation auswählen");
+    }
+    await api.configureDisplay(displayBodyFromPrefs(next));
+    await load();
+  }
+
+  async function handleDisplayModeChange(mode: DisplayUiMode) {
+    const previous = prefs;
+    const next = { ...prefs, mode };
+    updatePrefs(next);
+
+    if (!running) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      await applyDisplayConfig(next);
+    } catch (err) {
+      updatePrefs(previous);
+      setError(
+        err instanceof Error ? err.message : "Moduswechsel fehlgeschlagen",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   function setRotationModuleIds(moduleIds: string[]) {
@@ -136,23 +182,10 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      if (prefs.mode === "rotation") {
-        if (prefs.rotation.moduleIds.length === 0) {
-          throw new Error("Mindestens ein Modul für die Rotation auswählen");
-        }
-        await api.startDisplay({
-          rotation: {
-            moduleIds: prefs.rotation.moduleIds,
-            intervalMs: prefs.rotation.intervalSec * 1000,
-            eventHoldMs: prefs.rotation.eventHoldSec * 1000,
-            events: prefs.rotation.onTrackChange
-              ? ["media:track-changed"]
-              : [],
-          },
-        });
-      } else {
-        await api.startDisplay({ moduleId: prefs.moduleId });
+      if (prefs.mode === "rotation" && prefs.rotation.moduleIds.length === 0) {
+        throw new Error("Mindestens ein Modul für die Rotation auswählen");
       }
+      await api.startDisplay(displayBodyFromPrefs(prefs));
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Start fehlgeschlagen");
@@ -302,8 +335,8 @@ export default function App() {
                 { value: "single", label: "Einzelmodul" },
                 { value: "rotation", label: "Rotation" },
               ]}
-              onChange={setDisplayMode}
-              disabled={loading || running}
+              onChange={(mode) => void handleDisplayModeChange(mode)}
+              disabled={loading || !connected}
               ariaLabel="Anzeige-Modus"
             />
           </div>

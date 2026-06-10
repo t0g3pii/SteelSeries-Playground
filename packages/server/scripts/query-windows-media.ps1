@@ -1,6 +1,11 @@
 # Windows Global System Media Transport Controls → JSON
 $ErrorActionPreference = 'Stop'
 
+# UTF-8 für Node (stdout) — Umlaute in Titel/Artist korrekt
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = $utf8NoBom
+$OutputEncoding = $utf8NoBom
+
 function Write-MediaJson {
   param([hashtable]$Data)
   $Data | ConvertTo-Json -Compress -Depth 3

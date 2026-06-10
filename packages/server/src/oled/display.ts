@@ -2,6 +2,7 @@
  * Display bitmap logic adapted from steelseries-screen-controller
  * https://github.com/Aidan647/SteelSeries-Screen-Controller (CC BY-NC-SA 4.0)
  */
+import { sanitizeOledText } from "./text-sanitize.js";
 import type { Pixel, PixelColor, TextOptions } from "./types.js";
 
 export class Display {
@@ -44,7 +45,8 @@ export class Display {
   }
 
   drawText(options: TextOptions): this {
-    const { x, y, text, font, color, background } = options;
+    const { x, y, font, color, background } = options;
+    const text = sanitizeOledText(options.text);
     const verticalAlign = options.vertical_align ?? "top";
     const horizontalAlign = options.horizontal_align ?? "left";
 

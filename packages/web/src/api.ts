@@ -154,6 +154,11 @@ export const api = {
     }),
   stopDisplay: () =>
     request<{ ok: boolean }>("/api/display/stop", { method: "POST" }),
+  configureDisplay: (body: StartDisplayBody) =>
+    request<{ ok: boolean }>("/api/display/configure", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   switchDisplayModule: (moduleId: string) =>
     request<{ ok: boolean }>("/api/display/switch", {
       method: "POST",

@@ -250,6 +250,45 @@ export class DisplayManager {
     await this.pushUpdate();
   }
 
+  /** Modus/Module live umstellen — ohne Stop/Start. */
+  async configureDisplay(options: StartDisplayOptions): Promise<void> {
+    if (!this.running) {
+      await this.start(options);
+      return;
+    }
+
+    this.stopManualTest();
+
+    if (options.rotation) {
+      const moduleIds = this.validateRotationModuleIds(
+        options.rotation.moduleIds,
+      );
+      this.displayMode = "rotation";
+      this.rotation.start(options.rotation);
+      await this.rebindHandlers(moduleIds);
+
+      const initialModuleId =
+        this.rotation.resolveActiveModuleId() ?? moduleIds[0]!;
+      await this.activateModule(initialModuleId);
+      this.restartTimers();
+      await this.rotationTick();
+      return;
+    }
+
+    const moduleId = options.moduleId ?? "ip";
+    const module = this.registry.get(moduleId);
+    if (!module) {
+      throw new Error(`Modul '${moduleId}' nicht gefunden`);
+    }
+
+    this.rotation.stop();
+    this.displayMode = "single";
+    await this.rebindHandlers([moduleId]);
+    await this.activateModule(moduleId);
+    this.restartTimers();
+    await this.pushUpdate();
+  }
+
   async showFeatureTest(): Promise<void> {
     if (!this.running) {
       throw new Error("Display läuft nicht");
@@ -454,6 +493,16 @@ export class DisplayManager {
     }
 
     return unique;
+  }
+
+  private async rebindHandlers(moduleIds: string[]): Promise<void> {
+    await this.gameSense.removeGameEvent(GAME_ID, EVENT_ID);
+    await this.gameSense.bindGameEvent({
+      game: GAME_ID,
+      event: EVENT_ID,
+      value_optional: true,
+      handlers: this.collectScreenHandlers(moduleIds),
+    });
   }
 
   private collectScreenHandlers(moduleIds: string[]) {

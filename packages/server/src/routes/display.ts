@@ -103,6 +103,26 @@ export function createDisplayRouter(displayManager: DisplayManager): Router {
     }
   });
 
+  router.post("/configure", async (req: Request, res: Response) => {
+    try {
+      const rotation = parseRotationBody(req.body);
+      if (rotation) {
+        await displayManager.configureDisplay({ rotation });
+      } else {
+        const moduleId =
+          typeof req.body?.moduleId === "string" ? req.body.moduleId : "ip";
+        await displayManager.configureDisplay({ moduleId });
+      }
+      res.json({ ok: true, display: displayManager.getStatus() });
+    } catch (err) {
+      res.status(400).json({
+        ok: false,
+        error:
+          err instanceof Error ? err.message : "Konfiguration fehlgeschlagen",
+      });
+    }
+  });
+
   router.post("/switch", async (req: Request, res: Response) => {
     const moduleId =
       typeof req.body?.moduleId === "string" ? req.body.moduleId : "";
