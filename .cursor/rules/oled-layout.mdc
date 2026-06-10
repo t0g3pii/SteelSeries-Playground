@@ -1,0 +1,42 @@
+---
+description: Verbindlicher OLED-Layout-Vertrag für GameDAC (128×52 sichtbar, 128×64 gesendet)
+globs:
+  - packages/server/src/oled/**
+  - packages/web/src/oled/**
+  - packages/web/src/components/OledLivePreview.*
+---
+
+# OLED Layout Contract (strikt einhalten)
+
+Quelle: `packages/server/src/oled/layout-contract.ts`
+
+## Gesendet vs. sichtbar
+
+- **GameSense-Bitmap:** 128×64 (`image-data-128x64`) — immer voll senden
+- **Gerät / Geräteansicht:** 128×52 — nur Y=0…51 ist sichtbar
+- **Preview:** auf `displayHeight: 52` croppen, nicht 64 mit schwarzem Balken
+
+## Text & Layout
+
+- Nur innerhalb der **sichtbaren** 128×52 Fläche zeichnen
+- **2px Padding** oben und unten (`CONTENT_PADDING_64` / `content.paddingPx`)
+- **Max. 6 Zeilen** à 8px — Helfer: `lineTopOffset`, `contentLine1Top`, `maxTextLines`
+- Keine hardcodierten Y-Werte außerhalb der Helfer in `deadzone.ts`
+
+## Preview / Geräteansicht
+
+- `devicePreviewMaskBelowY` = **52**
+- `applyDeviceViewMask` bzw. Canvas-Crop auf 52px Höhe
+- Diagnose-Frames (Deadzone, Pixel-Checker) nutzen sichtbare Maße für Ecken/Text
+
+## Verboten ohne Hardware-Retest
+
+- `DEVICE_VISIBLE_HEIGHT_64`, `CONTENT_PADDING_64` oder Contract-Werte ändern
+- Preview wieder auf volles 64px-Display ohne Crop
+- Text unter Y=51 platzieren und „sichtbar“ erwarten
+
+## Verifizierung nach Änderungen
+
+1. Pixel-Checker (4s-Invertierung) — 128×52 Zählung
+2. Zeilen testen — 6 Zeilen sichtbar
+3. Deadzone-Ecken — Ecken bei (0,0) und (127,51), Label „128x52“

@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/component-tests.ts","./src/feature-test.ts","./src/main.tsx","./src/oled-preview-poll.ts","./src/vite-env.d.ts","./src/components/oledlivepreview.tsx","./src/oled/applydeviceview.ts","./src/oled/decodebitmap.ts"],"version":"5.9.3"}
