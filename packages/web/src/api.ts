@@ -1,7 +1,16 @@
 import type { ComponentTestId } from "./component-tests";
 import type { FeatureTestInfo } from "./feature-test";
 
-export type DisplayRotationEventId = "media:track-changed";
+export type DisplayRotationEventId =
+  | "media:track-changed"
+  | "template:full-hour";
+
+export interface ModuleRotationSettingDef {
+  id: DisplayRotationEventId;
+  label: string;
+  description?: string;
+  defaultEnabled?: boolean;
+}
 
 export interface DisplayRotationStatus {
   active: boolean;
@@ -20,6 +29,7 @@ export interface ModuleInfo {
   description?: string;
   supportsRotation?: boolean;
   rotationEvents?: DisplayRotationEventId[];
+  rotationSettings?: ModuleRotationSettingDef[];
 }
 
 export interface StatusResponse {

@@ -35,6 +35,7 @@ export class ModuleRegistry {
       description: m.description,
       supportsRotation: m.supportsRotation,
       rotationEvents: m.rotationEvents,
+      rotationSettings: m.rotationSettings,
     }));
   }
 }

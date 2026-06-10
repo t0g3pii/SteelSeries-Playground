@@ -19,6 +19,10 @@ import {
   type DisplayUiMode,
 } from "./display-preferences";
 import type { FeatureTestInfo } from "./feature-test";
+import {
+  ensureModuleSettings,
+  rotationEventsFromModuleSettings,
+} from "./module-rotation-settings";
 import { getOledPreviewPollIntervalMs } from "./oled-preview-poll";
 import "./App.css";
 
@@ -46,6 +50,7 @@ export default function App() {
 
   function displayBodyFromPrefs(
     next: DisplayPreferences,
+    modules = status?.modules ?? [],
   ): StartDisplayBody {
     if (next.mode === "rotation") {
       return {
@@ -53,9 +58,11 @@ export default function App() {
           moduleIds: next.rotation.moduleIds,
           intervalMs: next.rotation.intervalSec * 1000,
           eventHoldMs: next.rotation.eventHoldSec * 1000,
-          events: next.rotation.onTrackChange
-            ? ["media:track-changed"]
-            : [],
+          events: rotationEventsFromModuleSettings(
+            next.rotation.moduleIds,
+            next.rotation.moduleSettings,
+            modules,
+          ),
         },
       };
     }
@@ -108,15 +115,15 @@ export default function App() {
       return;
     }
 
-    setLoading(true);
     setError(null);
     try {
-      await applyDisplayConfig(next);
+      await api.configureDisplay(displayBodyFromPrefs(next));
+      const statusData = await api.getStatus();
+      setStatus(statusData);
+      saveDisplayPreferences(next);
     } catch (err) {
       updatePrefs(previous);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -126,8 +133,18 @@ export default function App() {
       return;
     }
 
+    const moduleSettings = ensureModuleSettings(
+      moduleIds,
+      prefs.rotation.moduleSettings,
+      status?.modules ?? [],
+    );
+
     try {
-      await commitRotationPrefs({ ...prefs.rotation, moduleIds });
+      await commitRotationPrefs({
+        ...prefs.rotation,
+        moduleIds,
+        moduleSettings,
+      });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Rotation fehlgeschlagen",
@@ -135,12 +152,21 @@ export default function App() {
     }
   }
 
-  async function handleRotationTrackChange(onTrackChange: boolean) {
+  async function handleModuleSettingsChange(
+    moduleId: string,
+    settings: Record<string, boolean>,
+  ) {
     try {
-      await commitRotationPrefs({ ...prefs.rotation, onTrackChange });
+      await commitRotationPrefs({
+        ...prefs.rotation,
+        moduleSettings: {
+          ...prefs.rotation.moduleSettings,
+          [moduleId]: settings,
+        },
+      });
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Rotation fehlgeschlagen",
+        err instanceof Error ? err.message : "Einstellungen fehlgeschlagen",
       );
     }
   }
@@ -185,10 +211,23 @@ export default function App() {
           },
         };
 
+        next = {
+          ...next,
+          rotation: {
+            ...next.rotation,
+            moduleSettings: ensureModuleSettings(
+              next.rotation.moduleIds,
+              next.rotation.moduleSettings,
+              statusData.modules,
+            ),
+          },
+        };
+
         if (statusData.display.running) {
           next = prefsFromRunningDisplay(
             statusData.display,
             availableIds,
+            statusData.modules,
             next,
           );
         }
@@ -200,7 +239,8 @@ export default function App() {
             current.rotation.moduleIds.join(",") ||
           next.rotation.intervalSec !== current.rotation.intervalSec ||
           next.rotation.eventHoldSec !== current.rotation.eventHoldSec ||
-          next.rotation.onTrackChange !== current.rotation.onTrackChange;
+          JSON.stringify(next.rotation.moduleSettings) !==
+            JSON.stringify(current.rotation.moduleSettings);
 
         if (changed) {
           saveDisplayPreferences(next);
@@ -421,9 +461,14 @@ export default function App() {
               <RotationModuleList
                 modules={status?.modules ?? []}
                 selectedIds={prefs.rotation.moduleIds}
-                disabled={loading || !connected}
+                moduleSettings={prefs.rotation.moduleSettings}
+                eventHoldSec={prefs.rotation.eventHoldSec}
+                disabled={!connected}
                 onChange={(moduleIds) =>
                   void handleRotationModuleIdsChange(moduleIds)
+                }
+                onModuleSettingsChange={(moduleId, settings) =>
+                  void handleModuleSettingsChange(moduleId, settings)
                 }
               />
 
@@ -475,18 +520,6 @@ export default function App() {
                   />
                 </label>
               </div>
-
-              <label className="rotation-event-option">
-                <input
-                  type="checkbox"
-                  checked={prefs.rotation.onTrackChange}
-                  onChange={(e) =>
-                    void handleRotationTrackChange(e.target.checked)
-                  }
-                  disabled={loading || !connected}
-                />
-                <span>Bei neuem Song → Now Playing priorisieren</span>
-              </label>
             </div>
           )}
 

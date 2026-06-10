@@ -21,7 +21,12 @@ import {
   type WindowsMediaSession,
 } from "../windows/media-session.js";
 import type { OledFrameKind } from "../oled/preview.js";
-import type { DisplayFrame, DisplayModule, DisplayRotationEventId } from "./types.js";
+import type {
+  DisplayFrame,
+  DisplayModule,
+  DisplayRotationEventId,
+  ModuleRotationSettingDef,
+} from "./types.js";
 
 /** OLED + GSMTC + Marquee: alles 1×/s (schont GameDAC). */
 export const MEDIA_REFRESH_INTERVAL_MS = 1_000;
@@ -82,6 +87,15 @@ export class MediaModule implements DisplayModule {
   readonly description = "Aktueller Medientitel von Windows (Spotify, Jellyfin, …).";
   readonly supportsRotation = true;
   readonly rotationEvents: DisplayRotationEventId[] = ["media:track-changed"];
+  readonly rotationSettings: ModuleRotationSettingDef[] = [
+    {
+      id: "media:track-changed",
+      label: "Bei neuem Song priorisieren",
+      description:
+        "Unterbricht die Rotation und zeigt Now Playing für die Event-Dauer.",
+      defaultEnabled: true,
+    },
+  ];
   readonly preferredRefreshIntervalMs = MEDIA_REFRESH_INTERVAL_MS;
 
   private cachedSession: WindowsMediaSession = {

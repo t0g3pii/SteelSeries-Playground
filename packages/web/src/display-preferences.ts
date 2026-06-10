@@ -1,10 +1,17 @@
+import type { ModuleInfo } from "./api";
+import {
+  defaultModuleSettings,
+  moduleSettingsFromEvents,
+  type ModuleSettingsMap,
+} from "./module-rotation-settings";
+
 export type DisplayUiMode = "single" | "rotation";
 
 export interface RotationPreferences {
   moduleIds: string[];
   intervalSec: number;
   eventHoldSec: number;
-  onTrackChange: boolean;
+  moduleSettings: ModuleSettingsMap;
 }
 
 export interface DisplayPreferences {
@@ -15,6 +22,11 @@ export interface DisplayPreferences {
 
 const STORAGE_KEY = "gamedac.displayPreferences";
 
+const DEFAULT_MODULE_SETTINGS: ModuleSettingsMap = {
+  media: { "media:track-changed": true },
+  template: { "template:full-hour": false },
+};
+
 const DEFAULTS: DisplayPreferences = {
   mode: "single",
   moduleId: "ip",
@@ -22,7 +34,7 @@ const DEFAULTS: DisplayPreferences = {
     moduleIds: ["ip", "media"],
     intervalSec: 15,
     eventHoldSec: 15,
-    onTrackChange: true,
+    moduleSettings: { ...DEFAULT_MODULE_SETTINGS },
   },
 };
 
@@ -30,15 +42,47 @@ function isDisplayUiMode(value: unknown): value is DisplayUiMode {
   return value === "single" || value === "rotation";
 }
 
-export function loadDisplayPreferences(): DisplayPreferences {
+function parseLegacyRotation(
+  rotation: Partial<RotationPreferences> & { onTrackChange?: boolean },
+  modules: ModuleInfo[],
+): ModuleSettingsMap {
+  if (rotation.moduleSettings && typeof rotation.moduleSettings === "object") {
+    return rotation.moduleSettings;
+  }
+
+  const settings = defaultModuleSettings(modules);
+  if (typeof rotation.onTrackChange === "boolean") {
+    settings.media = {
+      ...(settings.media ?? {}),
+      "media:track-changed": rotation.onTrackChange,
+    };
+  }
+
+  return Object.keys(settings).length > 0
+    ? settings
+    : { ...DEFAULT_MODULE_SETTINGS };
+}
+
+export function loadDisplayPreferences(
+  modules: ModuleInfo[] = [],
+): DisplayPreferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return { ...DEFAULTS, rotation: { ...DEFAULTS.rotation, moduleIds: [...DEFAULTS.rotation.moduleIds] } };
+      return {
+        ...DEFAULTS,
+        rotation: {
+          ...DEFAULTS.rotation,
+          moduleIds: [...DEFAULTS.rotation.moduleIds],
+          moduleSettings: { ...DEFAULT_MODULE_SETTINGS },
+        },
+      };
     }
 
     const parsed = JSON.parse(raw) as Partial<DisplayPreferences>;
-    const rotation: Partial<RotationPreferences> = parsed.rotation ?? {};
+    const rotation = (parsed.rotation ?? {}) as Partial<RotationPreferences> & {
+      onTrackChange?: boolean;
+    };
 
     return {
       mode: isDisplayUiMode(parsed.mode) ? parsed.mode : DEFAULTS.mode,
@@ -60,14 +104,18 @@ export function loadDisplayPreferences(): DisplayPreferences {
           typeof rotation.eventHoldSec === "number" && rotation.eventHoldSec > 0
             ? rotation.eventHoldSec
             : DEFAULTS.rotation.eventHoldSec,
-        onTrackChange:
-          typeof rotation.onTrackChange === "boolean"
-            ? rotation.onTrackChange
-            : DEFAULTS.rotation.onTrackChange,
+        moduleSettings: parseLegacyRotation(rotation, modules),
       },
     };
   } catch {
-    return { ...DEFAULTS, rotation: { ...DEFAULTS.rotation, moduleIds: [...DEFAULTS.rotation.moduleIds] } };
+    return {
+      ...DEFAULTS,
+      rotation: {
+        ...DEFAULTS.rotation,
+        moduleIds: [...DEFAULTS.rotation.moduleIds],
+        moduleSettings: { ...DEFAULT_MODULE_SETTINGS },
+      },
+    };
   }
 }
 
@@ -98,6 +146,7 @@ export function prefsFromRunningDisplay(
     } | null;
   },
   availableIds: string[],
+  modules: ModuleInfo[],
   current: DisplayPreferences,
 ): DisplayPreferences {
   if (!display.running) {
@@ -105,17 +154,24 @@ export function prefsFromRunningDisplay(
   }
 
   if (display.mode === "rotation" && display.rotation) {
+    const moduleIds = sanitizeRotationModuleIds(
+      display.rotation.moduleIds,
+      availableIds,
+    );
+
     return {
       ...current,
       mode: "rotation",
       rotation: {
-        moduleIds: sanitizeRotationModuleIds(
-          display.rotation.moduleIds,
-          availableIds,
-        ),
+        moduleIds,
         intervalSec: Math.round(display.rotation.intervalMs / 1000),
         eventHoldSec: Math.round(display.rotation.eventHoldMs / 1000),
-        onTrackChange: display.rotation.events.includes("media:track-changed"),
+        moduleSettings: moduleSettingsFromEvents(
+          moduleIds,
+          display.rotation.events,
+          modules,
+          current.rotation.moduleSettings,
+        ),
       },
     };
   }

@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from "react";
 import type { ModuleInfo } from "../api";
+import { ModuleSettingsDialog } from "./ModuleSettingsDialog";
 import "./RotationModuleList.css";
 
 function moveItem<T>(items: T[], from: number, to: number): T[] {
@@ -16,18 +17,28 @@ function moveItem<T>(items: T[], from: number, to: number): T[] {
 interface RotationModuleListProps {
   modules: ModuleInfo[];
   selectedIds: string[];
+  moduleSettings: Record<string, Record<string, boolean>>;
+  eventHoldSec: number;
   disabled?: boolean;
   onChange: (moduleIds: string[]) => void;
+  onModuleSettingsChange: (
+    moduleId: string,
+    settings: Record<string, boolean>,
+  ) => void;
 }
 
 export function RotationModuleList({
   modules,
   selectedIds,
+  moduleSettings,
+  eventHoldSec,
   disabled = false,
   onChange,
+  onModuleSettingsChange,
 }: RotationModuleListProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [settingsModuleId, setSettingsModuleId] = useState<string | null>(null);
 
   const rotatable = modules.filter(
     (module) => module.supportsRotation !== false,
@@ -42,7 +53,11 @@ export function RotationModuleList({
   );
 
   function reorder(from: number, to: number) {
-    onChange(moveItem(selectedIds, from, to));
+    const next = moveItem(selectedIds, from, to);
+    if (next.join(",") === selectedIds.join(",")) {
+      return;
+    }
+    onChange(next);
   }
 
   function addModule(moduleId: string) {
@@ -53,8 +68,12 @@ export function RotationModuleList({
     onChange(selectedIds.filter((id) => id !== moduleId));
   }
 
-  function handleDragStart(index: number) {
+  function handleDragStart(index: number, event: DragEvent) {
     if (disabled) return;
+    // Ohne setData funktionieren wiederholte Drags in Firefox/Chrome oft nur einmal.
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(index));
+    event.dataTransfer.dropEffect = "move";
     setDragIndex(index);
     setDropIndex(index);
   }
@@ -62,10 +81,13 @@ export function RotationModuleList({
   function handleDragOver(index: number, event: DragEvent) {
     if (disabled || dragIndex === null) return;
     event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
     setDropIndex(index);
   }
 
-  function handleDrop(index: number) {
+  function handleDrop(index: number, event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
     if (disabled || dragIndex === null) return;
     reorder(dragIndex, index);
     setDragIndex(null);
@@ -77,6 +99,21 @@ export function RotationModuleList({
     setDropIndex(null);
   }
 
+  function handleListDragOver(event: DragEvent) {
+    if (disabled || dragIndex === null) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  const settingsModule = settingsModuleId
+    ? selectedModules.find((module) => module.id === settingsModuleId)
+    : null;
+
+  const hasActiveSettings = (module: ModuleInfo): boolean =>
+    (module.rotationSettings ?? []).some(
+      (def) => moduleSettings[module.id]?.[def.id],
+    );
+
   return (
     <div className="rotation-module-list">
       <p className="rotation-list-hint">
@@ -84,7 +121,10 @@ export function RotationModuleList({
       </p>
 
       {selectedModules.length > 0 ? (
-        <ol className="rotation-queue">
+        <ol
+          className="rotation-queue"
+          onDragOver={handleListDragOver}
+        >
           {selectedModules.map((module, index) => (
             <li
               key={module.id}
@@ -98,9 +138,9 @@ export function RotationModuleList({
                 .filter(Boolean)
                 .join(" ")}
               draggable={!disabled}
-              onDragStart={() => handleDragStart(index)}
+              onDragStart={(event) => handleDragStart(index, event)}
               onDragOver={(event) => handleDragOver(index, event)}
-              onDrop={() => handleDrop(index)}
+              onDrop={(event) => handleDrop(index, event)}
               onDragEnd={handleDragEnd}
             >
               <span className="rotation-drag-handle" aria-hidden="true">
@@ -108,15 +148,36 @@ export function RotationModuleList({
               </span>
               <span className="rotation-queue-position">{index + 1}</span>
               <div className="rotation-queue-text">
-                <span className="rotation-queue-name">{module.name}</span>
+                <span className="rotation-queue-name">
+                  {module.name}
+                  {hasActiveSettings(module) ? (
+                    <span className="rotation-settings-badge" title="Events aktiv">
+                      ⚡
+                    </span>
+                  ) : null}
+                </span>
                 {module.description ? (
                   <span className="rotation-queue-desc">{module.description}</span>
                 ) : null}
               </div>
+              {(module.rotationSettings?.length ?? 0) > 0 ? (
+                <button
+                  type="button"
+                  className="rotation-settings-btn"
+                  onClick={() => setSettingsModuleId(module.id)}
+                  onDragStart={(event) => event.preventDefault()}
+                  disabled={disabled}
+                  aria-label={`${module.name} Einstellungen`}
+                  title="Einstellungen"
+                >
+                  ⚙
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="rotation-remove-btn"
                 onClick={() => removeModule(module.id)}
+                onDragStart={(event) => event.preventDefault()}
                 disabled={disabled || selectedModules.length <= 1}
                 aria-label={`${module.name} aus Rotation entfernen`}
               >
@@ -146,6 +207,16 @@ export function RotationModuleList({
             ))}
           </div>
         </div>
+      ) : null}
+
+      {settingsModule ? (
+        <ModuleSettingsDialog
+          module={settingsModule}
+          settings={moduleSettings[settingsModule.id] ?? {}}
+          eventHoldSec={eventHoldSec}
+          onClose={() => setSettingsModuleId(null)}
+          onSave={(settings) => onModuleSettingsChange(settingsModule.id, settings)}
+        />
       ) : null}
     </div>
   );

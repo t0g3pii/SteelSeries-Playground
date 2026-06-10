@@ -1,9 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { DisplayManager } from "../display/manager.js";
-import type {
-  DisplayRotationConfig,
-  DisplayRotationEventId,
-} from "../modules/types.js";
+import type { DisplayRotationConfig } from "../modules/types.js";
+import { isDisplayRotationEventId } from "../modules/types.js";
 import {
   DEFAULT_EVENT_HOLD_MS,
   DEFAULT_ROTATION_INTERVAL_MS,
@@ -50,8 +48,8 @@ function parseRotationBody(body: unknown): DisplayRotationConfig | null {
 
   const events = Array.isArray(raw.events)
     ? raw.events.filter(
-        (event): event is DisplayRotationEventId =>
-          event === "media:track-changed",
+        (event): event is DisplayRotationConfig["events"][number] =>
+          typeof event === "string" && isDisplayRotationEventId(event),
       )
     : [];
 

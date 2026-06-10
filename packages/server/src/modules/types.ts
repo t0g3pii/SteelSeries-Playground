@@ -6,7 +6,17 @@ export type DisplayFrameValue = string | number[];
 export type DisplayFrame = Record<string, DisplayFrameValue>;
 
 /** Events, die die Modul-Rotation unterbrechen können (z. B. neuer Song). */
-export type DisplayRotationEventId = "media:track-changed";
+export type DisplayRotationEventId =
+  | "media:track-changed"
+  | "template:full-hour";
+
+export interface ModuleRotationSettingDef {
+  id: DisplayRotationEventId;
+  label: string;
+  description?: string;
+  /** Standard in der UI, wenn noch nicht gespeichert. */
+  defaultEnabled?: boolean;
+}
 
 export interface DisplayModuleInfo {
   id: string;
@@ -14,6 +24,7 @@ export interface DisplayModuleInfo {
   description?: string;
   supportsRotation?: boolean;
   rotationEvents?: DisplayRotationEventId[];
+  rotationSettings?: ModuleRotationSettingDef[];
 }
 
 export interface DisplayModule extends DisplayModuleInfo {
@@ -56,4 +67,16 @@ export const ROTATION_EVENT_TARGETS: Record<
   string
 > = {
   "media:track-changed": "media",
+  "template:full-hour": "template",
 };
+
+export const DISPLAY_ROTATION_EVENT_IDS: DisplayRotationEventId[] = [
+  "media:track-changed",
+  "template:full-hour",
+];
+
+export function isDisplayRotationEventId(
+  value: string,
+): value is DisplayRotationEventId {
+  return (DISPLAY_ROTATION_EVENT_IDS as string[]).includes(value);
+}

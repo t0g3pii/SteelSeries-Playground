@@ -50,6 +50,12 @@
   font-size: 1rem;
   line-height: 1;
   user-select: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.rotation-queue-item:active .rotation-drag-handle {
+  cursor: grabbing;
 }
 
 .rotation-queue-position {
@@ -81,6 +87,18 @@
 .rotation-queue-desc {
   color: #94a3b8;
   font-size: 0.8rem;
+}
+
+.rotation-settings-btn {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rotation-settings-badge {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
 }
 
 .rotation-remove-btn {

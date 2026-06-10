@@ -20,6 +20,7 @@ Jedes Modul steuert, **was** auf dem GameDAC-OLED angezeigt wird. Die OLED-Baust
 | `preferredRefreshIntervalMs` | nein | Refresh-Rate beim Aktivieren |
 | `getFrameKind()` | nein | Vorschau-Typ für die Web-UI |
 | `getModuleData()` | nein | Daten für `GET /api/modules/:id` |
+| `rotationSettings` | nein | UI-Metadaten für Zahnrad-Popup in der Rotation |
 | `pollRotationEvent()` | nein | Events für Rotations-Unterbrechung |
 
 ## Rotation
@@ -29,7 +30,7 @@ Mehrere Module können im Dashboard als Warteschlange konfiguriert werden. Der `
 - **`staticFrame: true`** (z. B. IP): Frame einmal beim Aktivieren, danach nur Heartbeat.
 - **Dynamische Module** (Medien, Uhr): weiter 1×/s aktualisieren.
 
-Events (z. B. `media:track-changed`) können die Rotation unterbrechen und ein Modul für `eventHoldMs` priorisieren — unabhängig davon, welches statische Modul gerade angezeigt wird.
+Events (z. B. `media:track-changed`, `template:full-hour`) werden pro Modul im Dashboard (⚙) aktiviert und priorisieren das Modul für `eventHoldMs`.
 
 ## API
 
