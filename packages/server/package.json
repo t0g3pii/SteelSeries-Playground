@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "jpeg-js": "^0.4.4",
     "oled-font-pack": "^1.0.1"
   },
